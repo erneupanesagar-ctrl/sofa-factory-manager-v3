@@ -7,6 +7,9 @@ import path from 'path'
 export default defineConfig({
   plugins: [react(),tailwindcss()],
   base: '/',
+  preview: {
+    allowedHosts: ['3000-iem4o1bbijfaz0bge1eh8-fc4aaf32.manusvm.computer'],
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

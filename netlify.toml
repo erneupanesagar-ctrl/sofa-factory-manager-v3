@@ -1,0 +1,11 @@
+[build]
+  command = "pnpm run build"
+  publish = "dist"
+
+[build.environment]
+  # Specify Node.js version
+  NODE_VERSION = "20"
+  # Specify pnpm version
+  NPM_VERSION = "pnpm@8.15.6"
+  # Set the public URL for Vite
+  VITE_PUBLIC_URL = "/"

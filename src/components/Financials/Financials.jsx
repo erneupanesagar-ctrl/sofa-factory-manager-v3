@@ -21,16 +21,32 @@ export default function Financials() {
   const loadData = async () => {
     try {
       console.log('Financials: Loading data...');
-      const [salesData, purchasesData, labourData, cleaningData] = await Promise.all([
-        actions.getAllSales ? actions.getAllSales() : database.getAll('sales'),
-        database.getAll('purchases'),
-        database.getAll('labourPayments'),
-        database.getAll('cleaningServices')
-      ]);
+      
+      // Load each table separately to handle missing tables gracefully
+      const salesData = await (actions.getAllSales ? actions.getAllSales() : database.getAll('sales')).catch(err => {
+        console.warn('Failed to load sales:', err);
+        return [];
+      });
+      
+      const purchasesData = await database.getAll('purchases').catch(err => {
+        console.warn('Failed to load purchases:', err);
+        return [];
+      });
+      
+      const labourData = await database.getAll('labourPayments').catch(err => {
+        console.warn('Failed to load labour payments (table may not exist yet):', err.message);
+        return [];
+      });
+      
+      const cleaningData = await database.getAll('cleaningServices').catch(err => {
+        console.warn('Failed to load cleaning services:', err);
+        return [];
+      });
       
       console.log('Financials: Loaded sales:', salesData?.length || 0);
       console.log('Financials: Loaded purchases:', purchasesData?.length || 0);
-      console.log('Financials: Sales data:', salesData);
+      console.log('Financials: Loaded labour:', labourData?.length || 0);
+      console.log('Financials: Loaded cleaning:', cleaningData?.length || 0);
       
       setSales(salesData || []);
       setPurchases(purchasesData || []);

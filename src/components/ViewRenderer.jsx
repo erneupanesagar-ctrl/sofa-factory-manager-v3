@@ -4,6 +4,7 @@ import { useApp } from '../contexts/AppContext';
 import LoginScreen from './Auth/LoginScreen';
 import SetupWizard from './Auth/SetupWizard';
 import Dashboard from './Dashboard/Dashboard';
+import Settings from './Settings/Settings';
 
 // Placeholder component for features under development
 function PlaceholderView({ title, description }) {
@@ -148,10 +149,7 @@ export default function ViewRenderer() {
       />;
       
     case 'settings':
-      return <PlaceholderView 
-        title="Settings" 
-        description="Configure application settings and preferences"
-      />;
+      return <Settings />;
       
     default:
       return <Dashboard />;

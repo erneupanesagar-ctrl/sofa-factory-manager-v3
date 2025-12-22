@@ -521,6 +521,52 @@ export function AppProvider({ children }) {
       }
     },
 
+    // Company and Locations actions
+    updateCompany: async (companyData) => {
+      try {
+        const companies = await db.getAll('companies');
+        if (companies.length > 0) {
+          const company = companies[0];
+          const updatedCompany = { ...company, ...companyData };
+          await db.update('companies', updatedCompany);
+          dispatch({ type: ActionTypes.SET_COMPANY, payload: updatedCompany });
+          return updatedCompany;
+        } else {
+          const id = await db.add('companies', companyData);
+          const newCompany = await db.get('companies', id);
+          dispatch({ type: ActionTypes.SET_COMPANY, payload: newCompany });
+          return newCompany;
+        }
+      } catch (error) {
+        console.error('Failed to update company:', error);
+        throw error;
+      }
+    },
+
+    updateLocations: async (locationsData) => {
+      try {
+        // Clear existing locations
+        const existingLocations = await db.getAll('locations');
+        for (const loc of existingLocations) {
+          await db.delete('locations', loc.id);
+        }
+
+        // Add new locations
+        const newLocations = [];
+        for (const locData of locationsData) {
+          const id = await db.add('locations', locData);
+          const location = await db.get('locations', id);
+          newLocations.push(location);
+        }
+
+        dispatch({ type: ActionTypes.SET_LOCATIONS, payload: newLocations });
+        return newLocations;
+      } catch (error) {
+        console.error('Failed to update locations:', error);
+        throw error;
+      }
+    },
+
     // Refresh data
     refreshData: async () => {
       await loadAppData();

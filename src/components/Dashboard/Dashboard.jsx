@@ -37,12 +37,21 @@ export default function Dashboard() {
         database.getAll('sales'),
         database.getAll('purchases'),
         database.getAll('rawMaterials'),
-        database.getAll('products'),
+        database.getAll('sofaModels'), // Fixed: use sofaModels instead of products
         database.getAll('customers'),
         database.getAll('suppliers')
       ]);
 
-      // Filter by location if user is not admin
+      console.log('Dashboard data loaded:', {
+        sales: sales?.length || 0,
+        purchases: purchases?.length || 0,
+        rawMaterials: rawMaterials?.length || 0,
+        products: products?.length || 0,
+        customers: customers?.length || 0,
+        suppliers: suppliers?.length || 0
+      });
+
+      // Filter by location if user is not admin (but not for customers/suppliers)
       const filterByLocation = (items) => {
         if (user?.role === 'admin') return items;
         return items.filter(item => item.location === user?.location);
@@ -52,9 +61,9 @@ export default function Dashboard() {
         sales: filterByLocation(sales || []),
         purchases: filterByLocation(purchases || []),
         rawMaterials: filterByLocation(rawMaterials || []),
-        products: filterByLocation(products || []),
-        customers: filterByLocation(customers || []),
-        suppliers: filterByLocation(suppliers || []),
+        products: products || [], // Don't filter products by location
+        customers: customers || [], // Don't filter customers by location
+        suppliers: suppliers || [], // Don't filter suppliers by location
         loading: false
       });
     } catch (error) {

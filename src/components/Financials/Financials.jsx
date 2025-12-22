@@ -43,23 +43,40 @@ export default function Financials() {
 
     switch (selectedPeriod) {
       case 'week':
-        startDate.setDate(now.getDate() - 7);
+        // Start of this week (Sunday)
+        startDate.setDate(now.getDate() - now.getDay());
+        startDate.setHours(0, 0, 0, 0);
         break;
       case 'month':
-        startDate.setMonth(now.getMonth() - 1);
+        // Start of this month
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
         break;
       case 'quarter':
-        startDate.setMonth(now.getMonth() - 3);
+        // Start of this quarter
+        const currentMonth = now.getMonth();
+        const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+        startDate.setMonth(quarterStartMonth);
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
         break;
       case 'year':
-        startDate.setFullYear(now.getFullYear() - 1);
+        // Start of this year
+        startDate.setMonth(0);
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
         break;
       default:
-        startDate.setMonth(now.getMonth() - 1);
+        // Default to this month
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
     }
 
     return data.filter(item => {
+      if (!item[dateField]) return false;
       const itemDate = new Date(item[dateField]);
+      // Check if date is valid
+      if (isNaN(itemDate.getTime())) return false;
       return itemDate >= startDate && itemDate <= now;
     });
   };

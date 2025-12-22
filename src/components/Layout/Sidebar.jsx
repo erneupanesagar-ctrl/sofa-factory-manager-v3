@@ -99,6 +99,16 @@ const navigationItems = [
     roles: ['admin', 'labour_manager']
   },
   {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: Bell,
+    roles: ['admin', 'staff'],
+    children: [
+      { id: 'notification-queue', label: 'Notification Queue', icon: Bell },
+      { id: 'notification-settings', label: 'Settings', icon: Settings }
+    ]
+  },
+  {
     id: 'settings',
     label: 'Settings',
     icon: Settings,

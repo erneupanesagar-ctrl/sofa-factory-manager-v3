@@ -18,6 +18,8 @@ import Purchases from './Purchases/Purchases';
 import Financials from './Financials/Financials';
 import Reports from './Reports/Reports';
 import Production from './Production/Production';
+import NotificationSettings from './Notifications/NotificationSettings';
+import NotificationQueue from './Notifications/NotificationQueue';
 
 // Placeholder component for features under development
 function PlaceholderView({ title, description }) {
@@ -136,6 +138,12 @@ export default function ViewRenderer() {
       
     case 'settings':
       return <Settings />;
+      
+    case 'notification-settings':
+      return <NotificationSettings />;
+      
+    case 'notification-queue':
+      return <NotificationQueue />;
       
     default:
       return <Dashboard />;

@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { sendOrderConfirmation, sendPaymentReminder } from '../../lib/notificationService';
 
 export default function Sales() {
   const { state, actions } = useApp();
@@ -257,7 +258,15 @@ export default function Sales() {
         updatedAt: new Date().toISOString()
       };
 
-      await actions.addItem('sales', saleData);
+      const newSale = await actions.addItem('sales', saleData);
+      
+      // Send order confirmation notification
+      try {
+        await sendOrderConfirmation(actions, saleData, customer, product);
+      } catch (error) {
+        console.error('Error sending notification:', error);
+      }
+      
       alert('Sale recorded successfully! Waiting for admin approval.');
       handleCloseDialog();
     } catch (error) {

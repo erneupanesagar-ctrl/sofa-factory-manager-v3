@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '../../lib/utils';
+import { sendProductionStarted, sendProductionCompleted } from '../../lib/notificationService';
 
 export default function Production() {
   const { state, actions } = useApp();
@@ -167,6 +168,21 @@ export default function Production() {
 
       await actions.addItem('productions', productionData);
       
+      // Send production started notification if linked to order
+      if (productionData.orderId) {
+        try {
+          const order = orders.find(o => o.id === productionData.orderId);
+          if (order) {
+            const customer = state.customers?.find(c => c.id === order.customerId);
+            if (customer) {
+              await sendProductionStarted(actions, productionData, order, customer);
+            }
+          }
+        } catch (error) {
+          console.error('Error sending production started notification:', error);
+        }
+      }
+      
       // Update order status if linked
       if (formData.orderId) {
         const order = orders.find(o => o.id === parseInt(formData.orderId));
@@ -233,6 +249,21 @@ export default function Production() {
         }
       }
 
+      // Send production completed notification if linked to order
+      if (production.orderId) {
+        try {
+          const order = orders.find(o => o.id === production.orderId);
+          if (order) {
+            const customer = state.customers?.find(c => c.id === order.customerId);
+            if (customer) {
+              await sendProductionCompleted(actions, production, order, customer);
+            }
+          }
+        } catch (error) {
+          console.error('Error sending production completed notification:', error);
+        }
+      }
+      
       alert('Production completed successfully!\n\nMaterials deducted and stock updated.');
     } catch (error) {
       console.error('Error completing production:', error);

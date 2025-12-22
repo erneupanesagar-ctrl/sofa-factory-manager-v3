@@ -19,8 +19,8 @@ export default function Sales() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [viewingSale, setViewingSale] = useState(null);
   const [formData, setFormData] = useState({
-    customerId: '',
-    productId: '',
+    customerId: null,
+    productId: null,
     quantity: '1',
     unitPrice: '',
     discount: '0',
@@ -44,8 +44,8 @@ export default function Sales() {
 
   const handleOpenDialog = () => {
     setFormData({
-      customerId: '',
-      productId: '',
+      customerId: null,
+      productId: null,
       quantity: '1',
       unitPrice: '',
       discount: '0',
@@ -58,8 +58,8 @@ export default function Sales() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setFormData({
-      customerId: '',
-      productId: '',
+      customerId: null,
+      productId: null,
       quantity: '1',
       unitPrice: '',
       discount: '0',
@@ -70,12 +70,14 @@ export default function Sales() {
 
   const handleProductSelect = (productId) => {
     console.log('Product selected:', productId);
-    const product = sofaModels.find(p => p.id === productId);
+    // Convert string ID to number for comparison
+    const numericId = parseInt(productId);
+    const product = sofaModels.find(p => p.id === numericId);
     console.log('Product details:', product);
     if (product) {
       const newFormData = {
         ...formData,
-        productId,
+        productId: numericId,
         unitPrice: product.sellingPrice.toString()
       };
       console.log('Updated form data:', newFormData);
@@ -87,9 +89,11 @@ export default function Sales() {
   
   const handleCustomerSelect = (customerId) => {
     console.log('Customer selected:', customerId);
-    const customer = customers.find(c => c.id === customerId);
+    // Convert string ID to number for comparison
+    const numericId = parseInt(customerId);
+    const customer = customers.find(c => c.id === numericId);
     console.log('Customer details:', customer);
-    const newFormData = { ...formData, customerId };
+    const newFormData = { ...formData, customerId: numericId };
     console.log('Updated form data:', newFormData);
     setFormData(newFormData);
   };
@@ -327,13 +331,13 @@ export default function Sales() {
                   <Label htmlFor="customerId">
                     Customer <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={formData.customerId} onValueChange={handleCustomerSelect}>
+                  <Select value={formData.customerId?.toString() || ''} onValueChange={handleCustomerSelect}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>
                     <SelectContent>
                       {customers.map(customer => (
-                        <SelectItem key={customer.id} value={customer.id}>
+                        <SelectItem key={customer.id} value={customer.id.toString()}>
                           {customer.name}
                         </SelectItem>
                       ))}
@@ -345,13 +349,13 @@ export default function Sales() {
                   <Label htmlFor="productId">
                     Product <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={formData.productId} onValueChange={handleProductSelect}>
+                  <Select value={formData.productId?.toString() || ''} onValueChange={handleProductSelect}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select product" />
                     </SelectTrigger>
                     <SelectContent>
                       {sofaModels.map(product => (
-                        <SelectItem key={product.id} value={product.id}>
+                        <SelectItem key={product.id} value={product.id.toString()}>
                           {product.name} - {formatCurrency(product.sellingPrice)}
                         </SelectItem>
                       ))}

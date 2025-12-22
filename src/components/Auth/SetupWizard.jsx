@@ -40,7 +40,14 @@ export default function SetupWizard() {
   const [adminData, setAdminData] = useState({
     name: '',
     email: '',
-    phone: ''
+    phone: '',
+    username: '',
+    password: '',
+    confirmPassword: '',
+    securityQuestion1: 'What is your mother\'s maiden name?',
+    securityAnswer1: '',
+    securityQuestion2: 'What was the name of your first pet?',
+    securityAnswer2: ''
   });
 
   const [companyData, setCompanyData] = useState({
@@ -71,6 +78,25 @@ export default function SetupWizard() {
           newErrors.adminPhone = 'Phone is required';
         } else if (!isValidPhone(adminData.phone)) {
           newErrors.adminPhone = 'Invalid phone format';
+        }
+        if (!adminData.username.trim()) {
+          newErrors.adminUsername = 'Username is required';
+        } else if (adminData.username.length < 4) {
+          newErrors.adminUsername = 'Username must be at least 4 characters';
+        }
+        if (!adminData.password.trim()) {
+          newErrors.adminPassword = 'Password is required';
+        } else if (adminData.password.length < 6) {
+          newErrors.adminPassword = 'Password must be at least 6 characters';
+        }
+        if (adminData.password !== adminData.confirmPassword) {
+          newErrors.adminConfirmPassword = 'Passwords do not match';
+        }
+        if (!adminData.securityAnswer1.trim()) {
+          newErrors.securityAnswer1 = 'Security answer is required';
+        }
+        if (!adminData.securityAnswer2.trim()) {
+          newErrors.securityAnswer2 = 'Security answer is required';
         }
         break;
 
@@ -210,6 +236,91 @@ export default function SetupWizard() {
               {errors.adminPhone && (
                 <p className="text-sm text-red-500 mt-1">{errors.adminPhone}</p>
               )}
+            </div>
+
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Login Credentials</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="adminUsername">Username</Label>
+                  <Input
+                    id="adminUsername"
+                    value={adminData.username}
+                    onChange={(e) => setAdminData({ ...adminData, username: e.target.value })}
+                    placeholder="Choose a username (min 4 characters)"
+                    className={errors.adminUsername ? 'border-red-500' : ''}
+                  />
+                  {errors.adminUsername && (
+                    <p className="text-sm text-red-500 mt-1">{errors.adminUsername}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="adminPassword">Password</Label>
+                  <Input
+                    id="adminPassword"
+                    type="password"
+                    value={adminData.password}
+                    onChange={(e) => setAdminData({ ...adminData, password: e.target.value })}
+                    placeholder="Choose a password (min 6 characters)"
+                    className={errors.adminPassword ? 'border-red-500' : ''}
+                  />
+                  {errors.adminPassword && (
+                    <p className="text-sm text-red-500 mt-1">{errors.adminPassword}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="adminConfirmPassword">Confirm Password</Label>
+                  <Input
+                    id="adminConfirmPassword"
+                    type="password"
+                    value={adminData.confirmPassword}
+                    onChange={(e) => setAdminData({ ...adminData, confirmPassword: e.target.value })}
+                    placeholder="Re-enter your password"
+                    className={errors.adminConfirmPassword ? 'border-red-500' : ''}
+                  />
+                  {errors.adminConfirmPassword && (
+                    <p className="text-sm text-red-500 mt-1">{errors.adminConfirmPassword}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4 mt-4">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Security Questions</h3>
+              <p className="text-xs text-gray-500 mb-3">These will help you recover your password if you forget it</p>
+              
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="securityAnswer1">{adminData.securityQuestion1}</Label>
+                  <Input
+                    id="securityAnswer1"
+                    value={adminData.securityAnswer1}
+                    onChange={(e) => setAdminData({ ...adminData, securityAnswer1: e.target.value })}
+                    placeholder="Enter your answer"
+                    className={errors.securityAnswer1 ? 'border-red-500' : ''}
+                  />
+                  {errors.securityAnswer1 && (
+                    <p className="text-sm text-red-500 mt-1">{errors.securityAnswer1}</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label htmlFor="securityAnswer2">{adminData.securityQuestion2}</Label>
+                  <Input
+                    id="securityAnswer2"
+                    value={adminData.securityAnswer2}
+                    onChange={(e) => setAdminData({ ...adminData, securityAnswer2: e.target.value })}
+                    placeholder="Enter your answer"
+                    className={errors.securityAnswer2 ? 'border-red-500' : ''}
+                  />
+                  {errors.securityAnswer2 && (
+                    <p className="text-sm text-red-500 mt-1">{errors.securityAnswer2}</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         );

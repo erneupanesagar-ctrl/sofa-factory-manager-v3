@@ -7,11 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Factory, UserPlus, LogIn, Shield } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
+import PasswordRecovery from './PasswordRecovery';
 
 export default function LoginScreen() {
   const { actions } = useApp();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
+
+  // If password recovery is active, show that component
+  if (showPasswordRecovery) {
+    return <PasswordRecovery onBack={() => setShowPasswordRecovery(false)} />;
+  }
 
   // Admin login form
   const [adminCredentials, setAdminCredentials] = useState({
@@ -155,6 +162,16 @@ export default function LoginScreen() {
                   {errors.admin && (
                     <p className="text-sm text-red-500">{errors.admin}</p>
                   )}
+
+                  <div className="flex items-center justify-end mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordRecovery(true)}
+                      className="text-sm text-slate-600 hover:text-slate-800 underline"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
 
                   <Button 
                     type="submit" 

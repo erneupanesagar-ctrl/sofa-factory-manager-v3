@@ -29,11 +29,21 @@ function PlaceholderView({ title, description }) {
 }
 
 export default function ViewRenderer() {
-  const { state } = useApp();
-  const { isAuthenticated, isLoading, currentView, company } = state;
+  const { state, auth } = useApp();
+  const { isAuthenticated, isLoading, currentView, company, user } = state;
+  const [isFirstTime, setIsFirstTime] = React.useState(null);
+
+  // Check if this is first-time setup
+  React.useEffect(() => {
+    const checkFirstTime = async () => {
+      const firstTime = await auth.isFirstTimeSetup();
+      setIsFirstTime(firstTime);
+    };
+    checkFirstTime();
+  }, [auth]);
 
   // Show loading state
-  if (isLoading) {
+  if (isLoading || isFirstTime === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -44,12 +54,17 @@ export default function ViewRenderer() {
     );
   }
 
+  // Show setup wizard for first-time setup (no users exist)
+  if (isFirstTime) {
+    return <SetupWizard />;
+  }
+
   // Show login screen if not authenticated
   if (!isAuthenticated) {
     return <LoginScreen />;
   }
 
-  // Show setup wizard if no company profile
+  // Show setup wizard if authenticated but no company profile
   if (!company) {
     return <SetupWizard />;
   }

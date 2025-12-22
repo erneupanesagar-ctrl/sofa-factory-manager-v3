@@ -69,14 +69,29 @@ export default function Sales() {
   };
 
   const handleProductSelect = (productId) => {
+    console.log('Product selected:', productId);
     const product = sofaModels.find(p => p.id === productId);
+    console.log('Product details:', product);
     if (product) {
-      setFormData({
+      const newFormData = {
         ...formData,
         productId,
         unitPrice: product.sellingPrice.toString()
-      });
+      };
+      console.log('Updated form data:', newFormData);
+      setFormData(newFormData);
+    } else {
+      console.error('Product not found for ID:', productId);
     }
+  };
+  
+  const handleCustomerSelect = (customerId) => {
+    console.log('Customer selected:', customerId);
+    const customer = customers.find(c => c.id === customerId);
+    console.log('Customer details:', customer);
+    const newFormData = { ...formData, customerId };
+    console.log('Updated form data:', newFormData);
+    setFormData(newFormData);
   };
 
   const calculateTotal = () => {
@@ -90,6 +105,13 @@ export default function Sales() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    console.log('=== SALES FORM SUBMISSION DEBUG ===');
+    console.log('Form Data:', formData);
+    console.log('Customers available:', customers.length);
+    console.log('Products available:', sofaModels.length);
+    console.log('All customers:', customers);
+    console.log('All products:', sofaModels);
+    
     // Check if customers and products exist
     if (customers.length === 0) {
       alert('No customers found! Please add customers first from the Customers page.');
@@ -102,7 +124,8 @@ export default function Sales() {
     }
     
     if (!formData.customerId || !formData.productId) {
-      alert('Please select customer and product');
+      console.error('Missing selection - Customer ID:', formData.customerId, 'Product ID:', formData.productId);
+      alert('Please select both customer and product from the dropdowns');
       return;
     }
 
@@ -110,8 +133,12 @@ export default function Sales() {
       const customer = customers.find(c => c.id === formData.customerId);
       const product = sofaModels.find(p => p.id === formData.productId);
       
+      console.log('Found customer:', customer);
+      console.log('Found product:', product);
+      
       if (!customer || !product) {
-        alert('Invalid customer or product selection. Please try again.');
+        console.error('Validation failed - Customer found:', !!customer, 'Product found:', !!product);
+        alert(`Invalid selection. Customer: ${customer ? 'OK' : 'NOT FOUND'}, Product: ${product ? 'OK' : 'NOT FOUND'}`);
         return;
       }
 
@@ -300,7 +327,7 @@ export default function Sales() {
                   <Label htmlFor="customerId">
                     Customer <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
+                  <Select value={formData.customerId} onValueChange={handleCustomerSelect}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select customer" />
                     </SelectTrigger>

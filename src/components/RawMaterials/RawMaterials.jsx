@@ -1,156 +1,441 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useApp } from '../../contexts/AppContext';
+import { Plus, Search, Edit, Trash2, Package, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function RawMaterials() {
-  const [materials, setMaterials] = useState([
-    { id: '1', name: 'Teak Wood', quantity: 150, unit: 'kg', price: 800, minStock: 50, category: 'Wood' },
-    { id: '2', name: 'Fabric - Blue Velvet', quantity: 80, unit: 'm', price: 1200, minStock: 30, category: 'Fabric' },
-    { id: '3', name: 'Foam Cushion', quantity: 45, unit: 'pcs', price: 500, minStock: 20, category: 'Cushioning' },
-    { id: '4', name: 'Screws & Nails', quantity: 500, unit: 'pcs', price: 5, minStock: 200, category: 'Hardware' }
-  ]);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const { state, actions } = useApp();
+  const { rawMaterials = [] } = state;
+  
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    category: 'Wood',
+    quantity: '',
+    unit: 'meters',
+    pricePerUnit: '',
+    minStock: '',
+    supplier: '',
+    description: ''
+  });
 
-  const filteredMaterials = materials.filter(m =>
-    m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    m.category.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredMaterials = rawMaterials.filter(material =>
+    material.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (material.category && material.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (material.supplier && material.supplier.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getLowStockStatus = (quantity, minStock) => {
-    if (quantity === 0) return { label: 'Out of Stock', color: 'bg-red-100 text-red-800' };
-    if (quantity <= minStock) return { label: 'Low Stock', color: 'bg-yellow-100 text-yellow-800' };
-    return { label: 'In Stock', color: 'bg-green-100 text-green-800' };
+    const qty = parseFloat(quantity) || 0;
+    const min = parseFloat(minStock) || 0;
+    
+    if (qty === 0) return { label: 'Out of Stock', variant: 'destructive' };
+    if (qty <= min) return { label: 'Low Stock', variant: 'warning' };
+    return { label: 'In Stock', variant: 'success' };
   };
+
+  const handleOpenDialog = (material = null) => {
+    if (material) {
+      setEditingMaterial(material);
+      setFormData({
+        name: material.name,
+        category: material.category || 'Wood',
+        quantity: material.quantity?.toString() || '',
+        unit: material.unit || 'meters',
+        pricePerUnit: material.pricePerUnit?.toString() || '',
+        minStock: material.minStock?.toString() || '',
+        supplier: material.supplier || '',
+        description: material.description || ''
+      });
+    } else {
+      setEditingMaterial(null);
+      setFormData({
+        name: '',
+        category: 'Wood',
+        quantity: '',
+        unit: 'meters',
+        pricePerUnit: '',
+        minStock: '',
+        supplier: '',
+        description: ''
+      });
+    }
+    setIsDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsDialogOpen(false);
+    setEditingMaterial(null);
+    setFormData({
+      name: '',
+      category: 'Wood',
+      quantity: '',
+      unit: 'meters',
+      pricePerUnit: '',
+      minStock: '',
+      supplier: '',
+      description: ''
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!formData.name || !formData.quantity || !formData.pricePerUnit) {
+      alert('Please fill in required fields (Name, Quantity, Price)');
+      return;
+    }
+
+    try {
+      const materialData = {
+        name: formData.name,
+        category: formData.category,
+        quantity: parseFloat(formData.quantity),
+        unit: formData.unit,
+        pricePerUnit: parseFloat(formData.pricePerUnit),
+        minStock: parseFloat(formData.minStock) || 0,
+        supplier: formData.supplier,
+        description: formData.description,
+        createdAt: editingMaterial?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      if (editingMaterial) {
+        await actions.updateItem('rawMaterials', { ...materialData, id: editingMaterial.id });
+        alert('Material updated successfully!');
+      } else {
+        await actions.addItem('rawMaterials', materialData);
+        alert('Material added successfully!');
+      }
+      
+      handleCloseDialog();
+    } catch (error) {
+      console.error('Error saving material:', error);
+      alert('Failed to save material. Please try again.');
+    }
+  };
+
+  const handleDelete = async (material) => {
+    if (!window.confirm(`Are you sure you want to delete ${material.name}?`)) {
+      return;
+    }
+
+    try {
+      await actions.deleteItem('rawMaterials', material.id);
+      alert('Material deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting material:', error);
+      alert('Failed to delete material. Please try again.');
+    }
+  };
+
+  const totalValue = rawMaterials.reduce((sum, material) => {
+    return sum + ((material.quantity || 0) * (material.pricePerUnit || 0));
+  }, 0);
+
+  const lowStockCount = rawMaterials.filter(material => {
+    const qty = parseFloat(material.quantity) || 0;
+    const min = parseFloat(material.minStock) || 0;
+    return qty <= min;
+  }).length;
 
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Raw Materials</h1>
-        <p className="text-gray-600">Track and manage raw materials stock levels</p>
+        <h1 className="text-3xl font-bold text-gray-900">Raw Materials</h1>
+        <p className="text-gray-600 mt-1">Track and manage raw materials inventory</p>
       </div>
 
-      {/* Actions Bar */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex-1 max-w-md">
-          <input
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardDescription>Total Materials</CardDescription>
+            <CardTitle className="text-2xl">{rawMaterials.length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardDescription>Total Inventory Value</CardDescription>
+            <CardTitle className="text-2xl">NPR {totalValue.toLocaleString()}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardDescription>Low Stock Items</CardDescription>
+            <CardTitle className="text-2xl text-orange-600">{lowStockCount}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      {/* Search and Add */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
             type="text"
             placeholder="Search materials..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+            className="pl-10"
           />
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="ml-4 px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors flex items-center"
-        >
-          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+        <Button onClick={() => handleOpenDialog()} className="whitespace-nowrap">
+          <Plus className="w-4 h-4 mr-2" />
           Add Material
-        </button>
+        </Button>
       </div>
 
       {/* Materials Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredMaterials.map(material => {
-          const status = getLowStockStatus(material.quantity, material.minStock);
-          return (
-            <div key={material.id} className="bg-white rounded-lg shadow p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{material.name}</h3>
-                  <p className="text-sm text-gray-500">{material.category}</p>
+      {filteredMaterials.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredMaterials.map(material => {
+            const status = getLowStockStatus(material.quantity, material.minStock);
+            const totalValue = (material.quantity || 0) * (material.pricePerUnit || 0);
+            
+            return (
+              <Card key={material.id} className="hover:shadow-lg transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">{material.name}</CardTitle>
+                      <div className="flex gap-2 mt-2">
+                        {material.category && (
+                          <Badge variant="outline">{material.category}</Badge>
+                        )}
+                        <Badge variant={status.variant}>{status.label}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 mb-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Quantity:</span>
+                      <span className="font-medium">{material.quantity} {material.unit}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Price/Unit:</span>
+                      <span className="font-medium">NPR {material.pricePerUnit}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Min Stock:</span>
+                      <span className="font-medium">{material.minStock || 0} {material.unit}</span>
+                    </div>
+                    <div className="flex justify-between text-sm border-t pt-2">
+                      <span className="text-gray-600">Total Value:</span>
+                      <span className="font-semibold">NPR {totalValue.toLocaleString()}</span>
+                    </div>
+                    {material.supplier && (
+                      <div className="text-sm text-gray-600 pt-2">
+                        <span className="font-medium">Supplier:</span> {material.supplier}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleOpenDialog(material)}
+                    >
+                      <Edit className="w-3 h-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(material)}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Package className="w-16 h-16 text-gray-300 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              {searchTerm ? 'No materials found' : 'No materials yet'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {searchTerm ? 'Try adjusting your search' : 'Add your first material to get started'}
+            </p>
+            {!searchTerm && (
+              <Button onClick={() => handleOpenDialog()}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Material
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Add/Edit Material Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              {editingMaterial ? 'Edit Material' : 'Add New Material'}
+            </DialogTitle>
+            <DialogDescription>
+              {editingMaterial 
+                ? 'Update material information below' 
+                : 'Enter material details to add to your inventory'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit}>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">
+                    Material Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Teak Wood"
+                    required
+                  />
                 </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${status.color}`}>
-                  {status.label}
-                </span>
+
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Wood">Wood</SelectItem>
+                      <SelectItem value="Fabric">Fabric</SelectItem>
+                      <SelectItem value="Foam">Foam</SelectItem>
+                      <SelectItem value="Hardware">Hardware</SelectItem>
+                      <SelectItem value="Cushioning">Cushioning</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="quantity">
+                    Quantity <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.quantity}
+                    onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                    placeholder="e.g., 150"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="unit">Unit</Label>
+                  <Select
+                    value={formData.unit}
+                    onValueChange={(value) => setFormData({ ...formData, unit: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="meters">meters</SelectItem>
+                      <SelectItem value="pieces">pieces</SelectItem>
+                      <SelectItem value="sheets">sheets</SelectItem>
+                      <SelectItem value="kg">kg</SelectItem>
+                      <SelectItem value="liters">liters</SelectItem>
+                      <SelectItem value="boxes">boxes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="pricePerUnit">
+                    Price per Unit (NPR) <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="pricePerUnit"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.pricePerUnit}
+                    onChange={(e) => setFormData({ ...formData, pricePerUnit: e.target.value })}
+                    placeholder="e.g., 800"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="minStock">Minimum Stock Level</Label>
+                  <Input
+                    id="minStock"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.minStock}
+                    onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                    placeholder="e.g., 50"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Quantity:</span>
-                  <span className="text-sm font-medium text-gray-900">{material.quantity} {material.unit}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Price per unit:</span>
-                  <span className="text-sm font-medium text-gray-900">रू {material.price}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Min Stock:</span>
-                  <span className="text-sm font-medium text-gray-900">{material.minStock} {material.unit}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Total Value:</span>
-                  <span className="text-sm font-medium text-gray-900">रू {(material.quantity * material.price).toLocaleString()}</span>
-                </div>
+                <Label htmlFor="supplier">Supplier</Label>
+                <Input
+                  id="supplier"
+                  value={formData.supplier}
+                  onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  placeholder="e.g., Timber Traders Ltd"
+                />
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-200 flex space-x-2">
-                <button className="flex-1 px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200">
-                  Update Stock
-                </button>
-                <button className="flex-1 px-3 py-2 text-sm bg-slate-100 text-slate-700 rounded hover:bg-slate-200">
-                  Edit
-                </button>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Additional notes about this material"
+                />
               </div>
             </div>
-          );
-        })}
-      </div>
 
-      {/* Add Material Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Add New Material</h2>
-            <form onSubmit={(e) => { e.preventDefault(); setShowAddModal(false); alert('Material added!'); }}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Material Name *</label>
-                  <input type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500">
-                    <option>Wood</option>
-                    <option>Fabric</option>
-                    <option>Cushioning</option>
-                    <option>Hardware</option>
-                    <option>Other</option>
-                  </select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
-                    <input type="number" required min="0" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-                    <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500">
-                      <option>kg</option>
-                      <option>m</option>
-                      <option>pcs</option>
-                      <option>L</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Price per unit (रू)</label>
-                    <input type="number" min="0" step="0.01" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock</label>
-                    <input type="number" min="0" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500" />
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">Add Material</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {editingMaterial ? 'Update Material' : 'Add Material'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -87,7 +87,13 @@ const navigationItems = [
     roles: ['admin', 'staff']
   },
   {
-    id: 'sales',
+    id: 'production',
+    label: 'Production',
+    icon: Factory,
+    roles: ['admin', 'staff', 'labour_manager']
+  },
+  {
+    id: 'reports',
     label: 'Reports',
     icon: BarChart3,
     roles: ['admin', 'labour_manager']

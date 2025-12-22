@@ -17,6 +17,7 @@ import Suppliers from './Suppliers/Suppliers';
 import Purchases from './Purchases/Purchases';
 import Financials from './Financials/Financials';
 import Reports from './Reports/Reports';
+import Production from './Production/Production';
 
 // Placeholder component for features under development
 function PlaceholderView({ title, description }) {
@@ -126,6 +127,9 @@ export default function ViewRenderer() {
       
     case 'orders':
       return <Orders />;
+      
+    case 'production':
+      return <Production />;
       
     case 'reports':
       return <Reports />;

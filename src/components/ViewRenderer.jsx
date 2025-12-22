@@ -10,6 +10,13 @@ import FinishedProducts from './FinishedProducts/FinishedProducts';
 import Orders from './Orders/Orders';
 import Sales from './Sales/Sales';
 import CleaningServices from './CleaningServices/CleaningServices';
+import Labour from './Labour/Labour';
+import Inventory from './Inventory/Inventory';
+import RawMaterials from './RawMaterials/RawMaterials';
+import Suppliers from './Suppliers/Suppliers';
+import Purchases from './Purchases/Purchases';
+import Financials from './Financials/Financials';
+import Reports from './Reports/Reports';
 
 // Placeholder component for features under development
 function PlaceholderView({ title, description }) {
@@ -88,55 +95,40 @@ export default function ViewRenderer() {
       return <Dashboard />;
       
     case 'inventory':
-      return <FinishedProducts />;
+      return <Inventory />;
       
     case 'raw-materials':
-      return <PlaceholderView 
-        title="Raw Materials" 
-        description="Track and manage raw materials stock levels"
-      />;
+      return <RawMaterials />;
       
     case 'finished-products':
-      return <PlaceholderView 
-        title="Finished Products" 
-        description="View and manage finished sofa products"
-      />;
+      return <FinishedProducts />;
       
     case 'suppliers':
-      return <PlaceholderView 
-        title="Suppliers" 
-        description="Manage your supplier relationships and contacts"
-      />;
+      return <Suppliers />;
       
     case 'customers':
       return <Customers />;
       
     case 'labour':
-      return <PlaceholderView 
-        title="Labour Management" 
-        description="Track labour attendance, payments, and performance"
-      />;
+      return <Labour />;
       
     case 'sales':
       return <Sales />;
       
     case 'purchases':
-      return <PlaceholderView 
-        title="Purchases" 
-        description="Track purchase orders and expenses"
-      />;
+      return <Purchases />;
       
     case 'financials':
-      return <PlaceholderView 
-        title="Financial Reports" 
-        description="View comprehensive financial analytics and reports"
-      />;
+      return <Financials />;
       
     case 'cleaning':
       return <CleaningServices />;
       
     case 'orders':
       return <Orders />;
+      
+    case 'reports':
+      return <Reports />;
       
     case 'settings':
       return <Settings />;

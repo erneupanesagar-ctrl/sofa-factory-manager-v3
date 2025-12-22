@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import database from '../../lib/database';
 
 export default function Financials() {
-  const { state } = useApp();
+  const { state, actions } = useApp();
   const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [sales, setSales] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -16,16 +16,21 @@ export default function Financials() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [actions]);
 
   const loadData = async () => {
     try {
+      console.log('Financials: Loading data...');
       const [salesData, purchasesData, labourData, cleaningData] = await Promise.all([
-        database.getAll('sales'),
+        actions.getAllSales ? actions.getAllSales() : database.getAll('sales'),
         database.getAll('purchases'),
         database.getAll('labourPayments'),
         database.getAll('cleaningServices')
       ]);
+      
+      console.log('Financials: Loaded sales:', salesData?.length || 0);
+      console.log('Financials: Loaded purchases:', purchasesData?.length || 0);
+      console.log('Financials: Sales data:', salesData);
       
       setSales(salesData || []);
       setPurchases(purchasesData || []);

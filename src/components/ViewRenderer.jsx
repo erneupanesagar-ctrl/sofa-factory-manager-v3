@@ -29,17 +29,24 @@ function PlaceholderView({ title, description }) {
 }
 
 export default function ViewRenderer() {
-  const { state, auth } = useApp();
+  const { state, auth, actions } = useApp();
   const { isAuthenticated, isLoading, currentView, company, user } = state;
   const [isFirstTime, setIsFirstTime] = React.useState(null);
 
   // Check if this is first-time setup
   React.useEffect(() => {
     const checkFirstTime = async () => {
-      const firstTime = await auth.isFirstTimeSetup();
-      setIsFirstTime(firstTime);
+      try {
+        const firstTime = await auth.isFirstTimeSetup();
+        setIsFirstTime(firstTime);
+      } catch (error) {
+        console.error('Error checking first time setup:', error);
+        setIsFirstTime(false);
+      }
     };
-    checkFirstTime();
+    if (auth) {
+      checkFirstTime();
+    }
   }, [auth]);
 
   // Show loading state

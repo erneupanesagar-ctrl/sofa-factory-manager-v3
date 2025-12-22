@@ -1,7 +1,7 @@
 // ViewRenderer component - renders the appropriate view based on currentView state
 import React from 'react';
 import { useApp } from '../contexts/AppContext';
-import LoginScreen from './Auth/LoginScreen';
+import SimpleLogin from './Auth/SimpleLogin';
 import SetupWizard from './Auth/SetupWizard';
 import Dashboard from './Dashboard/Dashboard';
 import Settings from './Settings/Settings';
@@ -69,7 +69,7 @@ export default function ViewRenderer() {
 
   // Show login screen if not authenticated
   if (!isAuthenticated) {
-    return <LoginScreen />;
+    return <SimpleLogin />;
   }
 
   // Show setup wizard if authenticated but no company profile

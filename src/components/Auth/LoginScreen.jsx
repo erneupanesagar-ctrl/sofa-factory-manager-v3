@@ -8,12 +8,31 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Factory, UserPlus, LogIn, Shield } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 import PasswordRecovery from './PasswordRecovery';
+import { initializeDemoData } from '../../lib/demoData';
 
 export default function LoginScreen() {
   const { actions } = useApp();
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
+
+  // Demo mode handler
+  const handleDemoMode = async () => {
+    setLoading(true);
+    try {
+      // Initialize demo data
+      const demoUser = await initializeDemoData();
+      
+      // Login as demo user
+      await actions.login(demoUser.id);
+      
+      // Dashboard will load automatically
+    } catch (error) {
+      console.error('Demo mode error:', error);
+      alert('Failed to start demo mode. Please try again.');
+      setLoading(false);
+    }
+  };
 
   // If password recovery is active, show that component
   if (showPasswordRecovery) {
@@ -237,6 +256,23 @@ export default function LoginScreen() {
             <span className="text-slate-800 font-medium">
               Contact your administrator
             </span>
+          </p>
+        </div>
+
+        {/* Demo Mode Button */}
+        <div className="mt-6">
+          <button
+            onClick={handleDemoMode}
+            disabled={loading}
+            className="w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-md hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            {loading ? 'Starting Demo...' : 'Try Demo Mode (No Login Required)'}
+          </button>
+          <p className="text-xs text-gray-500 text-center mt-2">
+            Explore all features with pre-loaded demo data
           </p>
         </div>
       </div>

@@ -88,10 +88,10 @@ export default function Dashboard() {
   }
 
   // Calculate metrics
-  const totalSales = dashboardData.sales.filter(sale => sale.status === 'completed').length;
-  const pendingSales = dashboardData.sales.filter(sale => sale.status === 'pending').length;
+  const totalSales = dashboardData.sales.filter(sale => sale.approvalStatus === 'approved').length;
+  const pendingSales = dashboardData.sales.filter(sale => sale.approvalStatus === 'pending').length;
   const totalRevenue = dashboardData.sales
-    .filter(sale => sale.status === 'completed')
+    .filter(sale => sale.approvalStatus === 'approved')
     .reduce((sum, sale) => sum + (parseFloat(sale.totalAmount) || parseFloat(sale.salePrice) || 0), 0);
   
   const lowStockItems = dashboardData.rawMaterials.filter(material => 
@@ -270,7 +270,7 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Recent activity placeholder */}
+      {/* Recent activity */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -279,11 +279,79 @@ export default function Dashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>Recent activities will appear here</p>
-            <p className="text-sm">Sales, purchases, and other transactions</p>
-          </div>
+          {(() => {
+            // Combine and sort recent activities
+            const activities = [];
+            
+            // Add recent sales
+            dashboardData.sales.slice(0, 5).forEach(sale => {
+              activities.push({
+                type: 'sale',
+                icon: '💰',
+                title: `Sale ${sale.saleNumber}`,
+                description: `${sale.customerName} - ${sale.productName}`,
+                amount: `NPR ${sale.totalAmount?.toLocaleString() || 0}`,
+                status: sale.approvalStatus || 'pending',
+                date: sale.createdAt
+              });
+            });
+            
+            // Add recent purchases
+            dashboardData.purchases.slice(0, 3).forEach(purchase => {
+              activities.push({
+                type: 'purchase',
+                icon: '📦',
+                title: `Purchase #${purchase.id}`,
+                description: purchase.supplierName || 'Raw materials',
+                amount: `NPR ${purchase.totalAmount?.toLocaleString() || 0}`,
+                status: 'completed',
+                date: purchase.createdAt
+              });
+            });
+            
+            // Sort by date (most recent first)
+            activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const recentActivities = activities.slice(0, 8);
+            
+            return recentActivities.length > 0 ? (
+              <div className="space-y-3">
+                {recentActivities.map((activity, index) => (
+                  <div key={index} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-start space-x-3 flex-1">
+                      <span className="text-2xl">{activity.icon}</span>
+                      <div className="flex-1">
+                        <p className="font-medium text-sm">{activity.title}</p>
+                        <p className="text-xs text-gray-600">{activity.description}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {new Date(activity.date).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-sm text-green-600">{activity.amount}</p>
+                      {activity.status === 'pending' && (
+                        <Badge className="bg-orange-500 text-white text-xs mt-1">Pending</Badge>
+                      )}
+                      {activity.status === 'approved' && (
+                        <Badge className="bg-green-500 text-white text-xs mt-1">Approved</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No recent activities</p>
+                <p className="text-sm">Sales and purchases will appear here</p>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
     </div>

@@ -23,7 +23,8 @@ export default function FinishedProducts() {
     materialCost: '',
     laborCost: '',
     sellingPrice: '',
-    estimatedDays: ''
+    estimatedDays: '',
+    stockQuantity: ''
   });
 
   const filteredProducts = sofaModels.filter(product =>
@@ -40,7 +41,8 @@ export default function FinishedProducts() {
         materialCost: product.materialCost || '',
         laborCost: product.laborCost || '',
         sellingPrice: product.sellingPrice || '',
-        estimatedDays: product.estimatedDays || ''
+        estimatedDays: product.estimatedDays || '',
+        stockQuantity: product.stockQuantity || '0'
       });
     } else {
       setEditingProduct(null);
@@ -50,7 +52,8 @@ export default function FinishedProducts() {
         materialCost: '',
         laborCost: '',
         sellingPrice: '',
-        estimatedDays: ''
+        estimatedDays: '',
+        stockQuantity: ''
       });
     }
     setIsDialogOpen(true);
@@ -65,7 +68,8 @@ export default function FinishedProducts() {
       materialCost: '',
       laborCost: '',
       sellingPrice: '',
-      estimatedDays: ''
+      estimatedDays: '',
+      stockQuantity: ''
     });
   };
 
@@ -97,6 +101,7 @@ export default function FinishedProducts() {
         laborCost: parseFloat(formData.laborCost) || 0,
         sellingPrice: parseFloat(formData.sellingPrice) || 0,
         estimatedDays: parseInt(formData.estimatedDays) || 0,
+        stockQuantity: parseInt(formData.stockQuantity) || 0,
         totalCost: calculateTotalCost(),
         profit: calculateProfit(),
         createdAt: editingProduct?.createdAt || new Date().toISOString(),
@@ -228,6 +233,15 @@ export default function FinishedProducts() {
                       </p>
                     </div>
                   )}
+
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">Stock Quantity</span>
+                      <Badge variant={(product.stockQuantity || 0) > 0 ? 'default' : 'destructive'}>
+                        {product.stockQuantity || 0} units
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 mt-4 pt-4 border-t">
@@ -334,7 +348,7 @@ export default function FinishedProducts() {
                 <p className="text-xs text-gray-500">Material Cost + Labor Cost</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="sellingPrice">Selling Price (NPR)</Label>
                   <Input
@@ -356,6 +370,22 @@ export default function FinishedProducts() {
                     onChange={(e) => setFormData({ ...formData, estimatedDays: e.target.value })}
                     placeholder="0"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="stockQuantity">
+                    Stock Quantity <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="stockQuantity"
+                    type="number"
+                    min="0"
+                    value={formData.stockQuantity}
+                    onChange={(e) => setFormData({ ...formData, stockQuantity: e.target.value })}
+                    placeholder="0"
+                    required
+                  />
+                  <p className="text-xs text-gray-500">Available units in stock</p>
                 </div>
               </div>
 

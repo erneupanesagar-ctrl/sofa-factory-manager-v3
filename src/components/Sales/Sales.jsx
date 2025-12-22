@@ -109,6 +109,61 @@ export default function Sales() {
     return subtotal - discount;
   };
 
+  const handleApproveSale = async (sale) => {
+    if (!window.confirm(`Approve sale ${sale.saleNumber}? This will deduct ${sale.quantity} units from inventory.`)) {
+      return;
+    }
+
+    try {
+      // Update sale status
+      const updatedSale = {
+        ...sale,
+        approvalStatus: 'approved',
+        status: 'completed',
+        approvedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await actions.updateItem('sales', updatedSale);
+
+      // Deduct stock from product
+      const product = sofaModels.find(p => p.id === sale.productId);
+      if (product) {
+        const updatedProduct = {
+          ...product,
+          stockQuantity: (product.stockQuantity || 0) - sale.quantity,
+          updatedAt: new Date().toISOString()
+        };
+        await actions.updateItem('sofaModels', updatedProduct);
+      }
+
+      alert('Sale approved successfully! Stock has been updated.');
+    } catch (error) {
+      console.error('Error approving sale:', error);
+      alert('Failed to approve sale. Please try again.');
+    }
+  };
+
+  const handleRejectSale = async (sale) => {
+    const reason = window.prompt(`Reject sale ${sale.saleNumber}? Please enter reason:`);
+    if (!reason) return;
+
+    try {
+      const updatedSale = {
+        ...sale,
+        approvalStatus: 'rejected',
+        status: 'rejected',
+        rejectionReason: reason,
+        rejectedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await actions.updateItem('sales', updatedSale);
+      alert('Sale rejected successfully.');
+    } catch (error) {
+      console.error('Error rejecting sale:', error);
+      alert('Failed to reject sale. Please try again.');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -157,6 +212,12 @@ export default function Sales() {
       const dueAmount = totalAmount - paidAmount;
       const saleNumber = `SAL-${Date.now().toString().slice(-6)}`;
       
+      // Check stock availability
+      if ((product.stockQuantity || 0) < quantity) {
+        alert(`Insufficient stock! Available: ${product.stockQuantity || 0} units, Requested: ${quantity} units`);
+        return;
+      }
+      
       // Determine payment status
       let paymentStatus = 'unpaid';
       if (paidAmount >= totalAmount) {
@@ -190,13 +251,14 @@ export default function Sales() {
           }
         ],
         notes: formData.notes,
-        status: 'completed',
+        status: 'pending',
+        approvalStatus: 'pending',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
       await actions.addItem('sales', saleData);
-      alert('Sale recorded successfully!');
+      alert('Sale recorded successfully! Waiting for admin approval.');
       handleCloseDialog();
     } catch (error) {
       console.error('Error recording sale:', error);
@@ -293,9 +355,17 @@ export default function Sales() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold">{sale.saleNumber}</h3>
-                      <Badge variant="default" className="bg-green-100 text-green-800">
-                        {sale.status}
-                      </Badge>
+                      {sale.approvalStatus === 'pending' && (
+                        <Badge className="bg-orange-500 text-white">Pending Approval</Badge>
+                      )}
+                      {sale.approvalStatus === 'approved' && (
+                        <Badge variant="default" className="bg-green-100 text-green-800">
+                          Approved
+                        </Badge>
+                      )}
+                      {sale.approvalStatus === 'rejected' && (
+                        <Badge className="bg-red-100 text-red-800">Rejected</Badge>
+                      )}
                       {sale.paymentStatus === 'paid' && (
                         <Badge className="bg-green-500 text-white">Paid</Badge>
                       )}
@@ -339,14 +409,35 @@ export default function Sales() {
                     </div>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setViewingSale(sale)}
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    View
-                  </Button>
+                  <div className="flex gap-2">
+                    {sale.approvalStatus === 'pending' && (
+                      <>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => handleApproveSale(sale)}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => handleRejectSale(sale)}
+                        >
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setViewingSale(sale)}
+                    >
+                      <Eye className="w-4 h-4 mr-1" />
+                      View
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

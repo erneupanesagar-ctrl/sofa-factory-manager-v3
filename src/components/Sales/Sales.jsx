@@ -25,6 +25,7 @@ export default function Sales() {
     unitPrice: '',
     discount: '0',
     paymentMethod: 'cash',
+    paidAmount: '',
     notes: ''
   });
 
@@ -50,6 +51,7 @@ export default function Sales() {
       unitPrice: '',
       discount: '0',
       paymentMethod: 'cash',
+      paidAmount: '',
       notes: ''
     });
     setIsDialogOpen(true);
@@ -64,6 +66,7 @@ export default function Sales() {
       unitPrice: '',
       discount: '0',
       paymentMethod: 'cash',
+      paidAmount: '',
       notes: ''
     });
   };
@@ -149,7 +152,18 @@ export default function Sales() {
       const quantity = parseInt(formData.quantity) || 1;
       const unitPrice = parseFloat(formData.unitPrice) || 0;
       const discount = parseFloat(formData.discount) || 0;
+      const totalAmount = calculateTotal();
+      const paidAmount = parseFloat(formData.paidAmount) || 0;
+      const dueAmount = totalAmount - paidAmount;
       const saleNumber = `SAL-${Date.now().toString().slice(-6)}`;
+      
+      // Determine payment status
+      let paymentStatus = 'unpaid';
+      if (paidAmount >= totalAmount) {
+        paymentStatus = 'paid';
+      } else if (paidAmount > 0) {
+        paymentStatus = 'partial';
+      }
 
       const saleData = {
         saleNumber,
@@ -162,10 +176,21 @@ export default function Sales() {
         unitPrice,
         discount,
         subtotal: quantity * unitPrice,
-        totalAmount: calculateTotal(),
+        totalAmount,
+        paidAmount,
+        dueAmount,
+        paymentStatus,
         paymentMethod: formData.paymentMethod,
+        paymentHistory: [
+          {
+            amount: paidAmount,
+            method: formData.paymentMethod,
+            date: new Date().toISOString(),
+            note: 'Initial payment'
+          }
+        ],
         notes: formData.notes,
-        status: 'complete',
+        status: 'completed',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -271,9 +296,18 @@ export default function Sales() {
                       <Badge variant="default" className="bg-green-100 text-green-800">
                         {sale.status}
                       </Badge>
+                      {sale.paymentStatus === 'paid' && (
+                        <Badge className="bg-green-500 text-white">Paid</Badge>
+                      )}
+                      {sale.paymentStatus === 'partial' && (
+                        <Badge className="bg-yellow-500 text-white">Partial Payment</Badge>
+                      )}
+                      {sale.paymentStatus === 'unpaid' && (
+                        <Badge className="bg-red-500 text-white">Unpaid</Badge>
+                      )}
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mt-4">
                       <div>
                         <p className="text-sm text-gray-500">Customer</p>
                         <p className="font-medium">{sale.customerName}</p>
@@ -289,6 +323,12 @@ export default function Sales() {
                       <div>
                         <p className="text-sm text-gray-500">Total Amount</p>
                         <p className="font-medium text-green-600">{formatCurrency(sale.totalAmount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-500">Due Amount</p>
+                        <p className="font-medium text-red-600">
+                          {sale.dueAmount > 0 ? formatCurrency(sale.dueAmount) : 'NPR 0'}
+                        </p>
                       </div>
                     </div>
 
@@ -408,20 +448,49 @@ export default function Sales() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="paymentMethod">Payment Method</Label>
-                <Select value={formData.paymentMethod} onValueChange={(value) => setFormData({ ...formData, paymentMethod: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Select value={formData.paymentMethod} onValueChange={(value) => setFormData({ ...formData, paymentMethod: value })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="mobile_payment">Mobile Payment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="paidAmount">Paid Amount (NPR)</Label>
+                  <Input
+                    id="paidAmount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Enter amount paid"
+                    value={formData.paidAmount}
+                    onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500">
+                    Leave empty or enter 0 for unpaid. Total: {formatCurrency(calculateTotal())}
+                  </p>
+                </div>
               </div>
+
+              {formData.paidAmount && parseFloat(formData.paidAmount) < calculateTotal() && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="font-medium text-yellow-800">Due Amount:</span>
+                    <span className="text-lg font-bold text-yellow-900">
+                      {formatCurrency(calculateTotal() - parseFloat(formData.paidAmount || 0))}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
@@ -500,10 +569,60 @@ export default function Sales() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>Paid Amount</Label>
+                  <p className="font-medium text-green-600">
+                    {formatCurrency(viewingSale.paidAmount || 0)}
+                  </p>
+                </div>
+                <div>
+                  <Label>Due Amount</Label>
+                  <p className="font-medium text-red-600">
+                    {formatCurrency(viewingSale.dueAmount || 0)}
+                  </p>
+                </div>
+                <div>
+                  <Label>Payment Status</Label>
+                  <div>
+                    {viewingSale.paymentStatus === 'paid' && (
+                      <Badge className="bg-green-500 text-white">Paid</Badge>
+                    )}
+                    {viewingSale.paymentStatus === 'partial' && (
+                      <Badge className="bg-yellow-500 text-white">Partial</Badge>
+                    )}
+                    {viewingSale.paymentStatus === 'unpaid' && (
+                      <Badge className="bg-red-500 text-white">Unpaid</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <Label>Payment Method</Label>
                 <p className="font-medium capitalize">{viewingSale.paymentMethod.replace('_', ' ')}</p>
               </div>
+
+              {viewingSale.paymentHistory && viewingSale.paymentHistory.length > 0 && (
+                <div>
+                  <Label>Payment History</Label>
+                  <div className="mt-2 space-y-2">
+                    {viewingSale.paymentHistory.map((payment, index) => (
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">{formatCurrency(payment.amount)}</p>
+                          <p className="text-xs text-gray-500">
+                            {payment.method.replace('_', ' ')} • {formatDate(payment.date)}
+                          </p>
+                          {payment.note && (
+                            <p className="text-xs text-gray-600 mt-1">{payment.note}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {viewingSale.notes && (
                 <div>

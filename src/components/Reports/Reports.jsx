@@ -1,172 +1,688 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useApp } from '../../contexts/AppContext';
+import { FileText, Download, Calendar, TrendingUp, Package, DollarSign, Users, ClipboardList } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import database from '../../lib/database';
 
 export default function Reports() {
+  const { state } = useApp();
+  const [selectedPeriod, setSelectedPeriod] = useState('month');
   const [selectedReport, setSelectedReport] = useState(null);
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const reportTypes = [
     {
       id: 'sales',
       name: 'Sales Report',
       description: 'Detailed sales analysis and trends',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-        </svg>
-      ),
+      icon: <TrendingUp className="w-6 h-6" />,
       color: 'bg-blue-500'
     },
     {
       id: 'inventory',
       name: 'Inventory Report',
       description: 'Stock levels and inventory valuation',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-      ),
+      icon: <Package className="w-6 h-6" />,
       color: 'bg-green-500'
     },
     {
       id: 'financial',
       name: 'Financial Report',
       description: 'Profit & loss, revenue, and expenses',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
+      icon: <DollarSign className="w-6 h-6" />,
       color: 'bg-purple-500'
     },
     {
       id: 'labour',
       name: 'Labour Report',
       description: 'Attendance, payments, and productivity',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-      ),
+      icon: <Users className="w-6 h-6" />,
       color: 'bg-yellow-500'
     },
     {
       id: 'orders',
       name: 'Orders Report',
-      description: 'Order status, completion rates, and delays',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-        </svg>
-      ),
+      description: 'Order status, completion rates',
+      icon: <ClipboardList className="w-6 h-6" />,
       color: 'bg-red-500'
     },
     {
       id: 'customers',
       name: 'Customer Report',
       description: 'Customer insights and purchase history',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-        </svg>
-      ),
+      icon: <Users className="w-6 h-6" />,
       color: 'bg-indigo-500'
     }
   ];
 
+  const filterByPeriod = (data, dateField = 'date') => {
+    const now = new Date();
+    const startDate = new Date();
+
+    switch (selectedPeriod) {
+      case 'week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case 'quarter':
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case 'year':
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        startDate.setMonth(now.getMonth() - 1);
+    }
+
+    return data.filter(item => {
+      const itemDate = new Date(item[dateField]);
+      return itemDate >= startDate && itemDate <= now;
+    });
+  };
+
+  const generateReport = async (reportType) => {
+    setLoading(true);
+    setSelectedReport(reportType);
+
+    try {
+      let data = {};
+
+      switch (reportType) {
+        case 'sales':
+          data = await generateSalesReport();
+          break;
+        case 'inventory':
+          data = await generateInventoryReport();
+          break;
+        case 'financial':
+          data = await generateFinancialReport();
+          break;
+        case 'labour':
+          data = await generateLabourReport();
+          break;
+        case 'orders':
+          data = await generateOrdersReport();
+          break;
+        case 'customers':
+          data = await generateCustomersReport();
+          break;
+        default:
+          data = {};
+      }
+
+      setReportData(data);
+    } catch (error) {
+      console.error('Error generating report:', error);
+      alert('Failed to generate report');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateSalesReport = async () => {
+    const sales = await database.getAll('sales');
+    const filteredSales = filterByPeriod(sales.filter(s => s.approvalStatus === 'approved'));
+
+    const totalSales = filteredSales.length;
+    const totalRevenue = filteredSales.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0);
+    const averageSale = totalSales > 0 ? totalRevenue / totalSales : 0;
+
+    // Top products
+    const productSales = {};
+    filteredSales.forEach(sale => {
+      const key = sale.productName;
+      if (!productSales[key]) {
+        productSales[key] = { name: key, quantity: 0, revenue: 0 };
+      }
+      productSales[key].quantity += sale.quantity || 0;
+      productSales[key].revenue += sale.totalAmount || 0;
+    });
+
+    const topProducts = Object.values(productSales)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    return {
+      totalSales,
+      totalRevenue,
+      averageSale,
+      topProducts,
+      salesList: filteredSales
+    };
+  };
+
+  const generateInventoryReport = async () => {
+    const rawMaterials = await database.getAll('rawMaterials');
+    const finishedProducts = await database.getAll('sofaModels');
+
+    const totalRawMaterialValue = rawMaterials.reduce((sum, m) => 
+      sum + (m.quantity * m.pricePerUnit || 0), 0
+    );
+
+    const totalFinishedValue = finishedProducts.reduce((sum, p) => 
+      sum + ((p.stockQuantity || 0) * (p.sellingPrice || 0)), 0
+    );
+
+    const lowStockMaterials = rawMaterials.filter(m => 
+      m.quantity < (m.minimumStock || 10)
+    );
+
+    const lowStockProducts = finishedProducts.filter(p => 
+      (p.stockQuantity || 0) === 0
+    );
+
+    return {
+      rawMaterials,
+      finishedProducts,
+      totalRawMaterialValue,
+      totalFinishedValue,
+      lowStockMaterials,
+      lowStockProducts
+    };
+  };
+
+  const generateFinancialReport = async () => {
+    const sales = await database.getAll('sales');
+    const purchases = await database.getAll('purchases');
+    const labourPayments = await database.getAll('labourPayments');
+    const cleaningServices = await database.getAll('cleaningServices');
+
+    const filteredSales = filterByPeriod(sales.filter(s => s.approvalStatus === 'approved'));
+    const filteredPurchases = filterByPeriod(purchases);
+    const filteredLabour = filterByPeriod(labourPayments);
+    const filteredCleaning = filterByPeriod(cleaningServices.filter(s => s.status === 'completed'));
+
+    const salesRevenue = filteredSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+    const cleaningRevenue = filteredCleaning.reduce((sum, s) => sum + (s.price || 0), 0);
+    const totalRevenue = salesRevenue + cleaningRevenue;
+
+    const purchaseExpenses = filteredPurchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+    const labourExpenses = filteredLabour.reduce((sum, l) => sum + (l.amount || 0), 0);
+    const totalExpenses = purchaseExpenses + labourExpenses;
+
+    const netProfit = totalRevenue - totalExpenses;
+    const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0;
+
+    return {
+      totalRevenue,
+      salesRevenue,
+      cleaningRevenue,
+      totalExpenses,
+      purchaseExpenses,
+      labourExpenses,
+      netProfit,
+      profitMargin
+    };
+  };
+
+  const generateLabourReport = async () => {
+    const labourers = await database.getAll('labourers');
+    const attendance = await database.getAll('attendance');
+    const payments = await database.getAll('labourPayments');
+
+    const filteredAttendance = filterByPeriod(attendance);
+    const filteredPayments = filterByPeriod(payments);
+
+    const totalPayments = filteredPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+    const activeLabourers = labourers.filter(l => l.status === 'active').length;
+
+    const labourerStats = labourers.map(labourer => {
+      const labourerAttendance = filteredAttendance.filter(a => a.labourerId === labourer.id);
+      const labourerPayments = filteredPayments.filter(p => p.labourerId === labourer.id);
+      
+      const presentDays = labourerAttendance.filter(a => a.status === 'present').length;
+      const totalPaid = labourerPayments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+      return {
+        name: labourer.name,
+        specialization: labourer.specialization,
+        presentDays,
+        totalPaid
+      };
+    });
+
+    return {
+      activeLabourers,
+      totalPayments,
+      labourerStats,
+      attendanceRecords: filteredAttendance
+    };
+  };
+
+  const generateOrdersReport = async () => {
+    const orders = await database.getAll('orders');
+    const filteredOrders = filterByPeriod(orders);
+
+    const totalOrders = filteredOrders.length;
+    const completedOrders = filteredOrders.filter(o => o.status === 'completed').length;
+    const pendingOrders = filteredOrders.filter(o => o.status === 'pending').length;
+    const completionRate = totalOrders > 0 ? ((completedOrders / totalOrders) * 100).toFixed(1) : 0;
+
+    return {
+      totalOrders,
+      completedOrders,
+      pendingOrders,
+      completionRate,
+      ordersList: filteredOrders
+    };
+  };
+
+  const generateCustomersReport = async () => {
+    const customers = await database.getAll('customers');
+    const sales = await database.getAll('sales');
+
+    const filteredSales = filterByPeriod(sales.filter(s => s.approvalStatus === 'approved'));
+
+    const customerStats = customers.map(customer => {
+      const customerSales = filteredSales.filter(s => s.customerId === customer.id);
+      const totalPurchases = customerSales.length;
+      const totalSpent = customerSales.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+
+      return {
+        name: customer.name,
+        phone: customer.phone,
+        totalPurchases,
+        totalSpent
+      };
+    }).sort((a, b) => b.totalSpent - a.totalSpent);
+
+    const topCustomers = customerStats.slice(0, 10);
+
+    return {
+      totalCustomers: customers.length,
+      activeCustomers: customerStats.filter(c => c.totalPurchases > 0).length,
+      topCustomers,
+      customerStats
+    };
+  };
+
+  const getPeriodLabel = () => {
+    switch (selectedPeriod) {
+      case 'week': return 'This Week';
+      case 'month': return 'This Month';
+      case 'quarter': return 'This Quarter';
+      case 'year': return 'This Year';
+      default: return 'This Month';
+    }
+  };
+
+  const downloadReport = () => {
+    if (!reportData || !selectedReport) return;
+
+    const reportType = reportTypes.find(r => r.id === selectedReport);
+    const reportContent = JSON.stringify(reportData, null, 2);
+    const blob = new Blob([reportContent], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${reportType.name.replace(' ', '_')}_${selectedPeriod}_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-        <p className="text-gray-600">Generate and view business reports</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Reports</h1>
+          <p className="text-gray-600 mt-1">Generate and view business reports</p>
+        </div>
+        <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="week">This Week</SelectItem>
+            <SelectItem value="month">This Month</SelectItem>
+            <SelectItem value="quarter">This Quarter</SelectItem>
+            <SelectItem value="year">This Year</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Report Types Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {reportTypes.map((report) => (
-          <div
-            key={report.id}
-            className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer p-6"
-            onClick={() => setSelectedReport(report.id)}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`${report.color} text-white p-3 rounded-lg`}>
-                {report.icon}
-              </div>
-              <button className="text-gray-400 hover:text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-                </svg>
-              </button>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">{report.name}</h3>
-            <p className="text-sm text-gray-600 mb-4">{report.description}</p>
-            <button className="w-full px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm">
-              Generate Report
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick Stats */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Statistics</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">45</p>
-            <p className="text-sm text-gray-600">Total Orders</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">रू 450K</p>
-            <p className="text-sm text-gray-600">Revenue</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">32</p>
-            <p className="text-sm text-gray-600">Customers</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-gray-900">12</p>
-            <p className="text-sm text-gray-600">Products</p>
-          </div>
+      {!selectedReport && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {reportTypes.map((report) => (
+            <Card
+              key={report.id}
+              className="cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => generateReport(report.id)}
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className={`${report.color} text-white p-3 rounded-lg`}>
+                    {report.icon}
+                  </div>
+                </div>
+                <CardTitle className="mt-4">{report.name}</CardTitle>
+                <CardDescription>{report.description}</CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
         </div>
-      </div>
+      )}
 
-      {/* Report Generation Modal */}
-      {selectedReport && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Generate {reportTypes.find(r => r.id === selectedReport)?.name}</h2>
-            <form onSubmit={(e) => { e.preventDefault(); setSelectedReport(null); alert('Report generated!'); }}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500">
-                    <option>Last 7 Days</option>
-                    <option>Last 30 Days</option>
-                    <option>Last 3 Months</option>
-                    <option>Last 6 Months</option>
-                    <option>Last Year</option>
-                    <option>Custom Range</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Format</label>
-                  <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500">
-                    <option>PDF</option>
-                    <option>Excel</option>
-                    <option>CSV</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="flex items-center">
-                    <input type="checkbox" className="mr-2" />
-                    <span className="text-sm text-gray-700">Include charts and graphs</span>
-                  </label>
-                </div>
+      {/* Report View */}
+      {selectedReport && reportData && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={() => { setSelectedReport(null); setReportData(null); }}>
+              ← Back to Reports
+            </Button>
+            <Button onClick={downloadReport}>
+              <Download className="w-4 h-4 mr-2" />
+              Download Report
+            </Button>
+          </div>
+
+          {/* Sales Report */}
+          {selectedReport === 'sales' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Total Sales</CardDescription>
+                    <CardTitle className="text-2xl">{reportData.totalSales}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Total Revenue</CardDescription>
+                    <CardTitle className="text-2xl">NPR {reportData.totalRevenue.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Average Sale</CardDescription>
+                    <CardTitle className="text-2xl">NPR {reportData.averageSale.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
               </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button type="button" onClick={() => setSelectedReport(null)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700">Generate</button>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Products</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Product</TableHead>
+                        <TableHead>Quantity Sold</TableHead>
+                        <TableHead>Revenue</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.topProducts.map((product, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{product.name}</TableCell>
+                          <TableCell>{product.quantity}</TableCell>
+                          <TableCell>NPR {product.revenue.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Inventory Report */}
+          {selectedReport === 'inventory' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Raw Materials Value</CardDescription>
+                    <CardTitle className="text-2xl">NPR {reportData.totalRawMaterialValue.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Finished Products Value</CardDescription>
+                    <CardTitle className="text-2xl">NPR {reportData.totalFinishedValue.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
               </div>
-            </form>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Low Stock Alerts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <p className="font-medium">Raw Materials ({reportData.lowStockMaterials.length})</p>
+                    {reportData.lowStockMaterials.map((material, index) => (
+                      <div key={index} className="text-sm text-red-600">
+                        {material.name}: {material.quantity} {material.unit}
+                      </div>
+                    ))}
+                    <p className="font-medium mt-4">Finished Products ({reportData.lowStockProducts.length})</p>
+                    {reportData.lowStockProducts.map((product, index) => (
+                      <div key={index} className="text-sm text-red-600">
+                        {product.name}: Out of stock
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Financial Report */}
+          {selectedReport === 'financial' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Total Revenue</CardDescription>
+                    <CardTitle className="text-2xl text-green-600">NPR {reportData.totalRevenue.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Total Expenses</CardDescription>
+                    <CardTitle className="text-2xl text-red-600">NPR {reportData.totalExpenses.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Net Profit</CardDescription>
+                    <CardTitle className="text-2xl text-blue-600">NPR {reportData.netProfit.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Profit Margin</CardDescription>
+                    <CardTitle className="text-2xl">{reportData.profitMargin}%</CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Sales</span>
+                        <span className="font-medium">NPR {reportData.salesRevenue.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Cleaning Services</span>
+                        <span className="font-medium">NPR {reportData.cleaningRevenue.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Expense Breakdown</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Raw Materials</span>
+                        <span className="font-medium">NPR {reportData.purchaseExpenses.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Labour</span>
+                        <span className="font-medium">NPR {reportData.labourExpenses.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Labour Report */}
+          {selectedReport === 'labour' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Active Labourers</CardDescription>
+                    <CardTitle className="text-2xl">{reportData.activeLabourers}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Total Payments ({getPeriodLabel()})</CardDescription>
+                    <CardTitle className="text-2xl">NPR {reportData.totalPayments.toLocaleString()}</CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Labourer Statistics</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Specialization</TableHead>
+                        <TableHead>Present Days</TableHead>
+                        <TableHead>Total Paid</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.labourerStats.map((labourer, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{labourer.name}</TableCell>
+                          <TableCell>{labourer.specialization}</TableCell>
+                          <TableCell>{labourer.presentDays}</TableCell>
+                          <TableCell>NPR {labourer.totalPaid.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Orders Report */}
+          {selectedReport === 'orders' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Total Orders</CardDescription>
+                    <CardTitle className="text-2xl">{reportData.totalOrders}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Completed</CardDescription>
+                    <CardTitle className="text-2xl text-green-600">{reportData.completedOrders}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Pending</CardDescription>
+                    <CardTitle className="text-2xl text-orange-600">{reportData.pendingOrders}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Completion Rate</CardDescription>
+                    <CardTitle className="text-2xl">{reportData.completionRate}%</CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Customers Report */}
+          {selectedReport === 'customers' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Total Customers</CardDescription>
+                    <CardTitle className="text-2xl">{reportData.totalCustomers}</CardTitle>
+                  </CardHeader>
+                </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardDescription>Active Customers ({getPeriodLabel()})</CardDescription>
+                    <CardTitle className="text-2xl">{reportData.activeCustomers}</CardTitle>
+                  </CardHeader>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Top Customers</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Purchases</TableHead>
+                        <TableHead>Total Spent</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.topCustomers.map((customer, index) => (
+                        <TableRow key={index}>
+                          <TableCell>{customer.name}</TableCell>
+                          <TableCell>{customer.phone}</TableCell>
+                          <TableCell>{customer.totalPurchases}</TableCell>
+                          <TableCell>NPR {customer.totalSpent.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p className="text-gray-600">Generating report...</p>
           </div>
         </div>
       )}

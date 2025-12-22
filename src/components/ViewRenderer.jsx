@@ -5,6 +5,11 @@ import SimpleLogin from './Auth/SimpleLogin';
 import SetupWizard from './Auth/SetupWizard';
 import Dashboard from './Dashboard/Dashboard';
 import Settings from './Settings/Settings';
+import Customers from './Customers/Customers';
+import FinishedProducts from './FinishedProducts/FinishedProducts';
+import Orders from './Orders/Orders';
+import Sales from './Sales/Sales';
+import CleaningServices from './CleaningServices/CleaningServices';
 
 // Placeholder component for features under development
 function PlaceholderView({ title, description }) {
@@ -83,10 +88,7 @@ export default function ViewRenderer() {
       return <Dashboard />;
       
     case 'inventory':
-      return <PlaceholderView 
-        title="Inventory Management" 
-        description="Manage your raw materials and finished products inventory"
-      />;
+      return <FinishedProducts />;
       
     case 'raw-materials':
       return <PlaceholderView 
@@ -107,10 +109,7 @@ export default function ViewRenderer() {
       />;
       
     case 'customers':
-      return <PlaceholderView 
-        title="Customers" 
-        description="View and manage customer information"
-      />;
+      return <Customers />;
       
     case 'labour':
       return <PlaceholderView 
@@ -119,10 +118,7 @@ export default function ViewRenderer() {
       />;
       
     case 'sales':
-      return <PlaceholderView 
-        title="Sales" 
-        description="Manage sales orders and transactions"
-      />;
+      return <Sales />;
       
     case 'purchases':
       return <PlaceholderView 
@@ -137,16 +133,10 @@ export default function ViewRenderer() {
       />;
       
     case 'cleaning':
-      return <PlaceholderView 
-        title="Cleaning Services" 
-        description="Schedule and track cleaning service appointments"
-      />;
+      return <CleaningServices />;
       
     case 'orders':
-      return <PlaceholderView 
-        title="Orders" 
-        description="Manage customer orders and order fulfillment"
-      />;
+      return <Orders />;
       
     case 'settings':
       return <Settings />;

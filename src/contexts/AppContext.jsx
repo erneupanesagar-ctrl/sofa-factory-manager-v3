@@ -478,6 +478,16 @@ export function AppProvider({ children }) {
       }
     },
 
+    getAllOrders: async () => {
+      try {
+        const orders = await db.getAll('orders');
+        return orders || [];
+      } catch (error) {
+        console.error('Failed to get all orders:', error);
+        return [];
+      }
+    },
+
     // UI actions
     setSidebarOpen: (open) => {
       dispatch({ type: ActionTypes.SET_SIDEBAR_OPEN, payload: open });

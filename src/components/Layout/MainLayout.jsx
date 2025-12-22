@@ -6,8 +6,14 @@ import { useApp } from '../../contexts/AppContext';
 
 export default function MainLayout({ children }) {
   const { state } = useApp();
-  const { sidebarOpen } = state;
+  const { isAuthenticated, company } = state;
 
+  // For login and setup screens, render without layout
+  if (!isAuthenticated || !company) {
+    return <>{children}</>;
+  }
+
+  // For authenticated users with company setup, render with full layout
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}

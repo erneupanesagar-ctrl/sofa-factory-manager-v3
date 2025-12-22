@@ -101,9 +101,9 @@ const navigationItems = [
 ];
 
 export default function Sidebar() {
-  const { state, actions, auth } = useApp();
-  const { sidebarOpen, currentView, notifications } = state;
-  const currentUser = auth.getCurrentUser();
+  const { state, actions } = useApp();
+  const { sidebarOpen, currentView, notifications, user } = state;
+  const currentUser = user;
 
   const unreadNotifications = notifications.filter(n => !n.read).length;
 

@@ -1,11 +1,11 @@
-// Login screen for existing users and new user activation
+// Login screen for admin and staff users
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Factory, UserPlus, LogIn } from 'lucide-react';
+import { Factory, UserPlus, LogIn, Shield } from 'lucide-react';
 import { useApp } from '../../contexts/AppContext';
 
 export default function LoginScreen() {
@@ -13,8 +13,50 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Admin login form
+  const [adminCredentials, setAdminCredentials] = useState({
+    username: '',
+    password: ''
+  });
+
   // Setup code form
   const [setupCode, setSetupCode] = useState('');
+
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    
+    if (!adminCredentials.username.trim() || !adminCredentials.password.trim()) {
+      setErrors({ admin: 'Username and password are required' });
+      return;
+    }
+
+    setLoading(true);
+    setErrors({});
+
+    try {
+      // Get all users and find admin with matching credentials
+      const users = await actions.getAllUsers();
+      const admin = users.find(
+        u => u.role === 'admin' && 
+        u.username === adminCredentials.username && 
+        u.password === adminCredentials.password
+      );
+
+      if (!admin) {
+        setErrors({ admin: 'Invalid username or password' });
+        setLoading(false);
+        return;
+      }
+
+      // Login the admin user
+      await actions.loginUser(admin.id);
+    } catch (error) {
+      console.error('Admin login failed:', error);
+      setErrors({ admin: 'Login failed. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleActivateAccount = async (e) => {
     e.preventDefault();
@@ -54,54 +96,127 @@ export default function LoginScreen() {
           <p className="text-gray-600 mt-2">Access your account</p>
         </div>
 
-        {/* Login card */}
+        {/* Login card with tabs */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <UserPlus className="w-5 h-5" />
-              <span>Join Your Team</span>
-            </CardTitle>
-            <CardDescription>
-              Enter the setup code provided by your administrator
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleActivateAccount} className="space-y-4">
-              <div>
-                <Label htmlFor="setupCode">Setup Code</Label>
-                <Input
-                  id="setupCode"
-                  value={setupCode}
-                  onChange={(e) => setSetupCode(e.target.value.toUpperCase())}
-                  placeholder="Enter 6-character setup code"
-                  maxLength={6}
-                  className={`text-center text-lg tracking-widest ${
-                    errors.setupCode ? 'border-red-500' : ''
-                  }`}
-                />
-                {errors.setupCode && (
-                  <p className="text-sm text-red-500 mt-1">{errors.setupCode}</p>
-                )}
-                <p className="text-xs text-gray-500 mt-2">
-                  Ask your administrator for the setup code to join your team
-                </p>
-              </div>
+          <Tabs defaultValue="staff" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="admin" className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                Admin
+              </TabsTrigger>
+              <TabsTrigger value="staff" className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
+                Staff
+              </TabsTrigger>
+            </TabsList>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={loading || !setupCode.trim()}
-              >
-                {loading ? 'Activating Account...' : 'Activate Account'}
-              </Button>
-            </form>
-          </CardContent>
+            {/* Admin Login Tab */}
+            <TabsContent value="admin">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <LogIn className="w-5 h-5" />
+                  <span>Admin Login</span>
+                </CardTitle>
+                <CardDescription>
+                  Sign in with your administrator credentials
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAdminLogin} className="space-y-4">
+                  <div>
+                    <Label htmlFor="username">Username</Label>
+                    <Input
+                      id="username"
+                      value={adminCredentials.username}
+                      onChange={(e) => setAdminCredentials({
+                        ...adminCredentials,
+                        username: e.target.value
+                      })}
+                      placeholder="Enter your username"
+                      className={errors.admin ? 'border-red-500' : ''}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={adminCredentials.password}
+                      onChange={(e) => setAdminCredentials({
+                        ...adminCredentials,
+                        password: e.target.value
+                      })}
+                      placeholder="Enter your password"
+                      className={errors.admin ? 'border-red-500' : ''}
+                    />
+                  </div>
+
+                  {errors.admin && (
+                    <p className="text-sm text-red-500">{errors.admin}</p>
+                  )}
+
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={loading || !adminCredentials.username.trim() || !adminCredentials.password.trim()}
+                  >
+                    {loading ? 'Signing In...' : 'Sign In'}
+                  </Button>
+                </form>
+              </CardContent>
+            </TabsContent>
+
+            {/* Staff Activation Tab */}
+            <TabsContent value="staff">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <UserPlus className="w-5 h-5" />
+                  <span>Join Your Team</span>
+                </CardTitle>
+                <CardDescription>
+                  Enter the setup code provided by your administrator
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleActivateAccount} className="space-y-4">
+                  <div>
+                    <Label htmlFor="setupCode">Setup Code</Label>
+                    <Input
+                      id="setupCode"
+                      value={setupCode}
+                      onChange={(e) => setSetupCode(e.target.value.toUpperCase())}
+                      placeholder="Enter 6-character setup code"
+                      maxLength={6}
+                      className={`text-center text-lg tracking-widest ${
+                        errors.setupCode ? 'border-red-500' : ''
+                      }`}
+                    />
+                    {errors.setupCode && (
+                      <p className="text-sm text-red-500 mt-1">{errors.setupCode}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">
+                      Ask your administrator for the setup code to join your team
+                    </p>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={loading || !setupCode.trim()}
+                  >
+                    {loading ? 'Activating Account...' : 'Activate Account'}
+                  </Button>
+                </form>
+              </CardContent>
+            </TabsContent>
+          </Tabs>
         </Card>
 
         {/* Help text */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-600">
-            Don't have a setup code?{' '}
+            Need help?{' '}
             <span className="text-slate-800 font-medium">
               Contact your administrator
             </span>
@@ -111,4 +226,3 @@ export default function LoginScreen() {
     </div>
   );
 }
-

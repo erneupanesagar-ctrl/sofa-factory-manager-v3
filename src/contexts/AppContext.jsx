@@ -422,6 +422,28 @@ export function AppProvider({ children }) {
       }
     },
 
+    getAllUsers: async () => {
+      try {
+        const users = await db.getAll('users');
+        return users;
+      } catch (error) {
+        console.error('Failed to get all users:', error);
+        throw error;
+      }
+    },
+
+    loginUser: async (userId) => {
+      try {
+        const user = await auth.login(userId);
+        dispatch({ type: ActionTypes.SET_USER, payload: user });
+        await loadAppData();
+        return user;
+      } catch (error) {
+        console.error('Login failed:', error);
+        throw error;
+      }
+    },
+
     // Data actions
     addItem: async (collection, data) => {
       try {

@@ -22,8 +22,8 @@ export default function Orders() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [viewingOrder, setViewingOrder] = useState(null);
   const [formData, setFormData] = useState({
-    customerId: '',
-    productId: '',
+    customerId: null,
+    productId: null,
     quantity: '1',
     notes: '',
     dueDate: ''
@@ -55,8 +55,8 @@ export default function Orders() {
 
   const handleOpenDialog = () => {
     setFormData({
-      customerId: '',
-      productId: '',
+      customerId: null,
+      productId: null,
       quantity: '1',
       notes: '',
       dueDate: ''
@@ -67,8 +67,8 @@ export default function Orders() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setFormData({
-      customerId: '',
-      productId: '',
+      customerId: null,
+      productId: null,
       quantity: '1',
       notes: '',
       dueDate: ''
@@ -84,8 +84,11 @@ export default function Orders() {
     }
 
     try {
-      const customer = customers.find(c => c.id === formData.customerId);
-      const product = sofaModels.find(p => p.id === formData.productId);
+      const customerId = parseInt(formData.customerId);
+      const productId = parseInt(formData.productId);
+      
+      const customer = customers.find(c => c.id === customerId);
+      const product = sofaModels.find(p => p.id === productId);
       
       if (!customer || !product) {
         alert('Invalid customer or product selection');
@@ -344,13 +347,13 @@ export default function Orders() {
                 <Label htmlFor="customerId">
                   Customer <span className="text-red-500">*</span>
                 </Label>
-                <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
+                <Select value={formData.customerId?.toString() || ''} onValueChange={(value) => setFormData({ ...formData, customerId: parseInt(value) })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
                     {customers.map(customer => (
-                      <SelectItem key={customer.id} value={customer.id}>
+                      <SelectItem key={customer.id} value={customer.id.toString()}>
                         {customer.name} - {customer.phone}
                       </SelectItem>
                     ))}
@@ -362,13 +365,13 @@ export default function Orders() {
                 <Label htmlFor="productId">
                   Product <span className="text-red-500">*</span>
                 </Label>
-                <Select value={formData.productId} onValueChange={(value) => setFormData({ ...formData, productId: value })}>
+                <Select value={formData.productId?.toString() || ''} onValueChange={(value) => setFormData({ ...formData, productId: parseInt(value) })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select product" />
                   </SelectTrigger>
                   <SelectContent>
                     {sofaModels.map(product => (
-                      <SelectItem key={product.id} value={product.id}>
+                      <SelectItem key={product.id} value={product.id.toString()}>
                         {product.name} - {formatCurrency(product.sellingPrice)}
                       </SelectItem>
                     ))}

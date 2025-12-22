@@ -25,7 +25,9 @@ export default function FinishedProducts() {
     sellingPrice: '',
     estimatedDays: '',
     stockQuantity: '',
-    billOfMaterials: [] // Array of {materialId, materialName, quantity, unit, costPerUnit, totalCost}
+    billOfMaterials: [], // Array of {materialId, materialName, quantity, unit, costPerUnit, totalCost}
+    images: [], // Array of {id, data (base64), isPrimary}
+    primaryImageId: null
   });
 
   const filteredProducts = sofaModels.filter(product =>
@@ -44,7 +46,9 @@ export default function FinishedProducts() {
         sellingPrice: product.sellingPrice || '',
         estimatedDays: product.estimatedDays || '',
         stockQuantity: product.stockQuantity || '0',
-        billOfMaterials: product.billOfMaterials || []
+        billOfMaterials: product.billOfMaterials || [],
+        images: product.images || [],
+        primaryImageId: product.primaryImageId || null
       });
     } else {
       setEditingProduct(null);
@@ -73,7 +77,9 @@ export default function FinishedProducts() {
       sellingPrice: '',
       estimatedDays: '',
       stockQuantity: '',
-      billOfMaterials: []
+      billOfMaterials: [],
+      images: [],
+      primaryImageId: null
     });
   };
 
@@ -102,6 +108,71 @@ export default function FinishedProducts() {
     return selling - totalCost;
   };
 
+  const handleImageUpload = async (files) => {
+    if (!files || files.length === 0) return;
+
+    const maxImages = 5;
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    const remainingSlots = maxImages - formData.images.length;
+    const filesToProcess = files.slice(0, remainingSlots);
+
+    for (const file of filesToProcess) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file`);
+        continue;
+      }
+
+      // Validate file size
+      if (file.size > maxSize) {
+        alert(`${file.name} is too large (max 5MB)`);
+        continue;
+      }
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageId = Date.now() + Math.random();
+        const newImage = {
+          id: imageId,
+          data: e.target.result,
+          name: file.name
+        };
+
+        setFormData(prev => {
+          const newImages = [...prev.images, newImage];
+          return {
+            ...prev,
+            images: newImages,
+            // Set as primary if it's the first image
+            primaryImageId: prev.primaryImageId || imageId
+          };
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = (imageId) => {
+    setFormData(prev => {
+      const newImages = prev.images.filter(img => img.id !== imageId);
+      let newPrimaryId = prev.primaryImageId;
+      
+      // If removing the primary image, set the first remaining image as primary
+      if (imageId === prev.primaryImageId && newImages.length > 0) {
+        newPrimaryId = newImages[0].id;
+      } else if (newImages.length === 0) {
+        newPrimaryId = null;
+      }
+
+      return {
+        ...prev,
+        images: newImages,
+        primaryImageId: newPrimaryId
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -119,6 +190,8 @@ export default function FinishedProducts() {
         name: formData.name,
         description: formData.description,
         billOfMaterials: formData.billOfMaterials || [],
+        images: formData.images || [],
+        primaryImageId: formData.primaryImageId || null,
         materialCost: finalMaterialCost,
         laborCost: parseFloat(formData.laborCost) || 0,
         sellingPrice: parseFloat(formData.sellingPrice) || 0,
@@ -205,6 +278,21 @@ export default function FinishedProducts() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProducts.map((product) => (
             <Card key={product.id} className="hover:shadow-lg transition-shadow">
+              {/* Product Image */}
+              {product.images && product.images.length > 0 && (
+                <div className="relative h-48 overflow-hidden rounded-t-lg">
+                  <img
+                    src={product.images.find(img => img.id === product.primaryImageId)?.data || product.images[0].data}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {product.images.length > 1 && (
+                    <Badge className="absolute top-2 right-2 bg-black bg-opacity-70">
+                      +{product.images.length - 1} more
+                    </Badge>
+                  )}
+                </div>
+              )}
               <CardHeader>
                 <CardTitle className="text-lg">{product.name}</CardTitle>
                 {product.description && (
@@ -328,6 +416,89 @@ export default function FinishedProducts() {
                   placeholder="Enter product description"
                   rows={3}
                 />
+              </div>
+
+              {/* Product Images Section */}
+              <div className="space-y-3 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                <div>
+                  <Label className="text-base font-semibold">Product Images</Label>
+                  <p className="text-xs text-gray-500 mt-1">Upload up to 5 images (Click or drag & drop)</p>
+                </div>
+                
+                {/* Image Upload Area */}
+                <div className="space-y-3">
+                  {formData.images.length < 5 && (
+                    <div
+                      className="border-2 border-dashed border-gray-400 rounded-lg p-6 text-center hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer"
+                      onClick={() => document.getElementById('imageUpload').click()}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const files = Array.from(e.dataTransfer.files);
+                        handleImageUpload(files);
+                      }}
+                    >
+                      <Package className="w-12 h-12 mx-auto mb-2 text-gray-400" />
+                      <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                      <p className="text-xs text-gray-500 mt-1">PNG, JPG, JPEG up to 5MB</p>
+                      <input
+                        id="imageUpload"
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleImageUpload(Array.from(e.target.files))}
+                      />
+                    </div>
+                  )}
+
+                  {/* Image Preview Grid */}
+                  {formData.images.length > 0 && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {formData.images.map((image) => (
+                        <div
+                          key={image.id}
+                          className={`relative group border-2 rounded-lg overflow-hidden ${
+                            image.id === formData.primaryImageId
+                              ? 'border-blue-500 ring-2 ring-blue-200'
+                              : 'border-gray-300'
+                          }`}
+                        >
+                          <img
+                            src={image.data}
+                            alt="Product"
+                            className="w-full h-32 object-cover"
+                          />
+                          {image.id === formData.primaryImageId && (
+                            <Badge className="absolute top-2 left-2 bg-blue-500">Primary</Badge>
+                          )}
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-opacity flex items-center justify-center gap-2">
+                            {image.id !== formData.primaryImageId && (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => setFormData({ ...formData, primaryImageId: image.id })}
+                              >
+                                Set Primary
+                              </Button>
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => handleRemoveImage(image.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Bill of Materials Section */}

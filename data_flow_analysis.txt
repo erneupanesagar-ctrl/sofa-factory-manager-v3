@@ -1,0 +1,19 @@
+=== DATA FLOW ANALYSIS ===
+
+1. SALES WORKFLOW:
+   Customer → Order → Production → Sale → Payment → Cleaning Service
+   
+2. PURCHASE WORKFLOW:
+   Supplier → Purchase → Raw Materials → Inventory
+   
+3. PRODUCTION WORKFLOW:
+   Order → Raw Materials + Labour → Finished Product → Stock
+   
+4. FINANCIAL WORKFLOW:
+   Sales (Income) + Cleaning (Income) - Purchases (Expense) - Labour (Expense) = Profit
+
+5. INVENTORY WORKFLOW:
+   Purchase → Raw Materials Stock
+   Production → Finished Products Stock
+   Sale → Finished Products Stock (Decrease)
+

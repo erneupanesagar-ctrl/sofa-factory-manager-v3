@@ -88,11 +88,11 @@ export default function Dashboard() {
   }
 
   // Calculate metrics
-  const totalSales = dashboardData.sales.filter(sale => sale.status === 'approved').length;
+  const totalSales = dashboardData.sales.filter(sale => sale.status === 'completed').length;
   const pendingSales = dashboardData.sales.filter(sale => sale.status === 'pending').length;
   const totalRevenue = dashboardData.sales
-    .filter(sale => sale.status === 'approved')
-    .reduce((sum, sale) => sum + (parseFloat(sale.salePrice) || 0), 0);
+    .filter(sale => sale.status === 'completed')
+    .reduce((sum, sale) => sum + (parseFloat(sale.totalAmount) || parseFloat(sale.salePrice) || 0), 0);
   
   const lowStockItems = dashboardData.rawMaterials.filter(material => 
     (material.currentStock || 0) <= (material.minStock || 10)

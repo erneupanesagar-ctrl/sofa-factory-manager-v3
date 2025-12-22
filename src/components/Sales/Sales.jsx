@@ -90,6 +90,17 @@ export default function Sales() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Check if customers and products exist
+    if (customers.length === 0) {
+      alert('No customers found! Please add customers first from the Customers page.');
+      return;
+    }
+    
+    if (sofaModels.length === 0) {
+      alert('No products found! Please add finished products first from the Inventory page.');
+      return;
+    }
+    
     if (!formData.customerId || !formData.productId) {
       alert('Please select customer and product');
       return;
@@ -100,7 +111,7 @@ export default function Sales() {
       const product = sofaModels.find(p => p.id === formData.productId);
       
       if (!customer || !product) {
-        alert('Invalid customer or product selection');
+        alert('Invalid customer or product selection. Please try again.');
         return;
       }
 

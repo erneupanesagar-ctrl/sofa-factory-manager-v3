@@ -168,6 +168,18 @@ export default function Production() {
       };
 
       await actions.addItem('productions', productionData);
+
+      // AUTOMATION: Deduct materials from inventory immediately when production starts
+      for (const material of validation.materials) {
+        const rawMaterial = rawMaterials.find(rm => rm.id === parseInt(material.materialId));
+        if (rawMaterial) {
+          const newQuantity = rawMaterial.quantity - material.requiredQty;
+          await actions.updateItem('rawMaterials', {
+            ...rawMaterial,
+            quantity: newQuantity
+          });
+        }
+      }
       
       // Send production started notification if linked to order
       if (productionData.orderId) {
@@ -205,23 +217,11 @@ export default function Production() {
   };
 
   const handleCompleteProduction = async (production) => {
-    if (!window.confirm(`Complete production ${production.productionNumber}?\n\nThis will:\n- Deduct materials from inventory\n- Add ${production.quantity} units to stock`)) {
+    if (!window.confirm(`Complete production ${production.productionNumber}?\n\nThis will:\n- Add ${production.quantity} units to stock\n- Automatically update sales (if linked to order)`)) {
       return;
     }
 
     try {
-      // Deduct materials from raw materials
-      for (const material of production.materialsNeeded) {
-        const rawMaterial = rawMaterials.find(rm => rm.id === parseInt(material.materialId));
-        if (rawMaterial) {
-          const newQuantity = rawMaterial.quantity - material.requiredQty;
-          await actions.updateItem('rawMaterials', {
-            ...rawMaterial,
-            quantity: newQuantity
-          });
-        }
-      }
-
       // Add to finished products stock
       const product = sofaModels.find(p => p.id === production.sofaModelId);
       if (product) {
@@ -239,14 +239,39 @@ export default function Production() {
         actualCompletionDate: new Date().toISOString()
       });
 
-      // Update order status if linked
+      // AUTOMATION: Update order status and AUTO-GENERATE SALE if linked to order
       if (production.orderId) {
         const order = orders.find(o => o.id === production.orderId);
         if (order) {
+          // Update order status
           await actions.updateItem('orders', {
             ...order,
             status: 'completed'
           });
+
+          // AUTO-GENERATE SALE RECORD
+          const customer = state.customers?.find(c => c.id === order.customerId);
+          if (customer && product) {
+            const saleData = {
+              saleNumber: `SALE-${Date.now().toString().slice(-6)}`,
+              customerId: customer.id,
+              customerName: customer.name,
+              productId: product.id,
+              productName: product.name,
+              quantity: production.quantity,
+              unitPrice: product.sellingPrice || 0,
+              totalAmount: (product.sellingPrice || 0) * production.quantity,
+              paidAmount: 0, // Initial paid amount for auto-generated sale
+              paymentStatus: 'pending',
+              status: 'approved', // Auto-approved since production is complete
+              approvalStatus: 'approved',
+              orderId: order.id,
+              notes: `Auto-generated from Production #${production.productionNumber}`,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            await actions.addItem('sales', saleData);
+          }
         }
       }
 
@@ -265,7 +290,7 @@ export default function Production() {
         }
       }
       
-      alert('Production completed successfully!\n\nMaterials deducted and stock updated.');
+      alert('Production completed successfully!\n\nStock updated and sale record generated (if applicable).');
     } catch (error) {
       console.error('Error completing production:', error);
       alert('Failed to complete production. Please try again.');
@@ -273,11 +298,25 @@ export default function Production() {
   };
 
   const handleCancelProduction = async (production) => {
-    if (!window.confirm(`Cancel production ${production.productionNumber}?`)) {
+    if (!window.confirm(`Cancel production ${production.productionNumber}?\n\nThis will restore deducted materials to inventory.`)) {
       return;
     }
 
     try {
+      // AUTOMATION: Restore materials to inventory when production is cancelled
+      if (production.materialsNeeded) {
+        for (const material of production.materialsNeeded) {
+          const rawMaterial = rawMaterials.find(rm => rm.id === parseInt(material.materialId));
+          if (rawMaterial) {
+            const newQuantity = rawMaterial.quantity + material.requiredQty;
+            await actions.updateItem('rawMaterials', {
+              ...rawMaterial,
+              quantity: newQuantity
+            });
+          }
+        }
+      }
+
       await actions.updateItem('productions', {
         ...production,
         status: 'cancelled'
@@ -325,6 +364,9 @@ export default function Production() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Production Management</h1>
         <p className="text-gray-600 mt-1">Manage production jobs and track material usage</p>
+        <p className="text-xs text-blue-600 mt-1 font-medium italic">
+          * Starting production automatically deducts raw materials. Completing production automatically updates stock and generates sales records.
+        </p>
       </div>
 
       {/* Search and Add */}

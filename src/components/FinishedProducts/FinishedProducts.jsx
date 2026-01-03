@@ -235,6 +235,9 @@ export default function FinishedProducts() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Finished Products</h1>
         <p className="text-gray-600 mt-1">Manage your sofa models and product catalog</p>
+        <p className="text-xs text-blue-600 mt-1 font-medium italic">
+          * Stock is automatically updated when production is completed.
+        </p>
       </div>
 
       {/* Search and Add */}

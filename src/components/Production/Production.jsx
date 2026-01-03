@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../contexts/AppContext';
 import { Plus, Search, Factory, CheckCircle, XCircle, Clock, AlertTriangle, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -91,9 +91,10 @@ export default function Production() {
 
   // Handle product selection and validate materials
   const handleProductChange = (sofaModelId) => {
-    setFormData({ ...formData, sofaModelId });
-    if (sofaModelId && formData.quantity) {
-      const validation = validateMaterials(sofaModelId, formData.quantity);
+    const numericId = parseInt(sofaModelId);
+    setFormData({ ...formData, sofaModelId: numericId });
+    if (numericId && formData.quantity) {
+      const validation = validateMaterials(numericId, formData.quantity);
       setMaterialValidation(validation);
     }
   };
@@ -575,11 +576,15 @@ export default function Production() {
                     <SelectValue placeholder="Select a product..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {sofaModels.map(product => (
-                      <SelectItem key={product.id} value={product.id.toString()}>
-                        {product.name} (Stock: {product.stockQuantity || 0})
-                      </SelectItem>
-                    ))}
+                    {sofaModels && sofaModels.length > 0 ? (
+                      sofaModels.map(product => (
+                        <SelectItem key={product.id} value={product.id.toString()}>
+                          {product.name} (Stock: {product.stockQuantity || 0})
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <div className="p-2 text-sm text-gray-500 text-center">No products found</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

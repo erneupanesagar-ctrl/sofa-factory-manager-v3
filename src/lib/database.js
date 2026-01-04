@@ -176,9 +176,11 @@ class SofaFactoryDB {
     const transaction = this.db.transaction([storeName], 'readwrite');
     const store = transaction.objectStore(storeName);
     
-    // Add timestamp and sync tracking
-    data.createdAt = new Date().toISOString();
-    data.updatedAt = new Date().toISOString();
+    // Ensure data is an object before adding timestamps
+    if (typeof data === 'object' && data !== null) {
+      data.createdAt = new Date().toISOString();
+      data.updatedAt = new Date().toISOString();
+    }
     
     const result = await new Promise((resolve, reject) => {
       const request = store.add(data);
@@ -204,22 +206,42 @@ class SofaFactoryDB {
   }
 
   async getAll(storeName, indexName = null, value = null) {
-    if (!this.db) await this.init();
-    const transaction = this.db.transaction([storeName], 'readonly');
-    const store = transaction.objectStore(storeName);
-    
-    return new Promise((resolve, reject) => {
-      let request;
-      if (indexName && value !== null) {
-        const index = store.index(indexName);
-        request = index.getAll(value);
-      } else {
-        request = store.getAll();
+    try {
+      if (!this.db) await this.init();
+      
+      // Check if object store exists
+      if (!this.db.objectStoreNames.contains(storeName)) {
+        console.warn(`Object store '${storeName}' does not exist, returning empty array`);
+        return [];
       }
       
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+      const transaction = this.db.transaction([storeName], 'readonly');
+      const store = transaction.objectStore(storeName);
+      
+      return new Promise((resolve, reject) => {
+        let request;
+        if (indexName && value !== null) {
+          try {
+            const index = store.index(indexName);
+            request = index.getAll(value);
+          } catch (e) {
+            // Index doesn't exist, get all and filter
+            request = store.getAll();
+          }
+        } else {
+          request = store.getAll();
+        }
+        
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => {
+          console.error(`Error getting all from ${storeName}:`, request.error);
+          resolve([]); // Return empty array instead of rejecting
+        };
+      });
+    } catch (error) {
+      console.error(`Error in getAll for ${storeName}:`, error);
+      return [];
+    }
   }
 
   async update(storeName, data) {
@@ -227,7 +249,10 @@ class SofaFactoryDB {
     const transaction = this.db.transaction([storeName], 'readwrite');
     const store = transaction.objectStore(storeName);
     
-    data.updatedAt = new Date().toISOString();
+    // Ensure data is an object before adding timestamps
+    if (typeof data === 'object' && data !== null) {
+      data.updatedAt = new Date().toISOString();
+    }
     
     const result = await new Promise((resolve, reject) => {
       const request = store.put(data);

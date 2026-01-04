@@ -343,17 +343,17 @@ export function AppProvider({ children }) {
         db.getAll('orders')
       ]);
 
-      dispatch({ type: ActionTypes.SET_SUPPLIERS, payload: suppliers });
-      dispatch({ type: ActionTypes.SET_CUSTOMERS, payload: customers });
-      dispatch({ type: ActionTypes.SET_RAW_MATERIALS, payload: rawMaterials });
-      dispatch({ type: ActionTypes.SET_LABOURERS, payload: labourers });
-      dispatch({ type: ActionTypes.SET_SOFA_MODELS, payload: sofaModels });
-      dispatch({ type: ActionTypes.SET_PURCHASES, payload: purchases });
-      dispatch({ type: ActionTypes.SET_SALES, payload: sales });
-      dispatch({ type: ActionTypes.SET_CLEANING_SERVICES, payload: cleaningServices });
-      dispatch({ type: ActionTypes.SET_NOTIFICATIONS, payload: notifications });
-      dispatch({ type: ActionTypes.SET_PRODUCTIONS, payload: productions });
-      dispatch({ type: ActionTypes.SET_ORDERS, payload: orders });
+      dispatch({ type: ActionTypes.SET_SUPPLIERS, payload: suppliers || [] });
+      dispatch({ type: ActionTypes.SET_CUSTOMERS, payload: customers || [] });
+      dispatch({ type: ActionTypes.SET_RAW_MATERIALS, payload: rawMaterials || [] });
+      dispatch({ type: ActionTypes.SET_LABOURERS, payload: labourers || [] });
+      dispatch({ type: ActionTypes.SET_SOFA_MODELS, payload: sofaModels || [] });
+      dispatch({ type: ActionTypes.SET_PURCHASES, payload: purchases || [] });
+      dispatch({ type: ActionTypes.SET_SALES, payload: sales || [] });
+      dispatch({ type: ActionTypes.SET_CLEANING_SERVICES, payload: cleaningServices || [] });
+      dispatch({ type: ActionTypes.SET_NOTIFICATIONS, payload: notifications || [] });
+      dispatch({ type: ActionTypes.SET_PRODUCTIONS, payload: productions || [] });
+      dispatch({ type: ActionTypes.SET_ORDERS, payload: orders || [] });
     } catch (error) {
       console.error('Failed to load all data:', error);
     }
@@ -387,17 +387,17 @@ export function AppProvider({ children }) {
         db.getAll('orders', 'locationId', locationId)
       ]);
 
-      dispatch({ type: ActionTypes.SET_SUPPLIERS, payload: suppliers });
-      dispatch({ type: ActionTypes.SET_CUSTOMERS, payload: customers });
-      dispatch({ type: ActionTypes.SET_RAW_MATERIALS, payload: rawMaterials });
-      dispatch({ type: ActionTypes.SET_LABOURERS, payload: labourers });
-      dispatch({ type: ActionTypes.SET_SOFA_MODELS, payload: sofaModels });
-      dispatch({ type: ActionTypes.SET_PURCHASES, payload: purchases });
-      dispatch({ type: ActionTypes.SET_SALES, payload: sales });
-      dispatch({ type: ActionTypes.SET_CLEANING_SERVICES, payload: cleaningServices });
-      dispatch({ type: ActionTypes.SET_NOTIFICATIONS, payload: notifications });
-      dispatch({ type: ActionTypes.SET_PRODUCTIONS, payload: productions });
-      dispatch({ type: ActionTypes.SET_ORDERS, payload: orders });
+      dispatch({ type: ActionTypes.SET_SUPPLIERS, payload: suppliers || [] });
+      dispatch({ type: ActionTypes.SET_CUSTOMERS, payload: customers || [] });
+      dispatch({ type: ActionTypes.SET_RAW_MATERIALS, payload: rawMaterials || [] });
+      dispatch({ type: ActionTypes.SET_LABOURERS, payload: labourers || [] });
+      dispatch({ type: ActionTypes.SET_SOFA_MODELS, payload: sofaModels || [] });
+      dispatch({ type: ActionTypes.SET_PURCHASES, payload: purchases || [] });
+      dispatch({ type: ActionTypes.SET_SALES, payload: sales || [] });
+      dispatch({ type: ActionTypes.SET_CLEANING_SERVICES, payload: cleaningServices || [] });
+      dispatch({ type: ActionTypes.SET_NOTIFICATIONS, payload: notifications || [] });
+      dispatch({ type: ActionTypes.SET_PRODUCTIONS, payload: productions || [] });
+      dispatch({ type: ActionTypes.SET_ORDERS, payload: orders || [] });
     } catch (error) {
       console.error('Failed to load location data:', error);
     }

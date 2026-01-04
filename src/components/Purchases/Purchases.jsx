@@ -349,31 +349,34 @@ export default function Purchases() {
         
         // Auto-update or create raw materials in inventory for each item
         for (const item of processedItems) {
+          // Find existing material with SAME name AND SAME price
           const existingMaterial = rawMaterials.find(m => 
-            m.name.toLowerCase() === item.materialName.toLowerCase()
+            m.name.toLowerCase() === item.materialName.toLowerCase() &&
+            parseFloat(m.pricePerUnit) === parseFloat(item.pricePerUnit)
           );
           
           if (existingMaterial) {
-            // Update existing material quantity
+            // Same material AND same price - add to existing stock
             const updatedMaterial = {
               ...existingMaterial,
               quantity: (parseFloat(existingMaterial.quantity) || 0) + item.quantity,
-              pricePerUnit: item.pricePerUnit,
+              lastPurchaseDate: formData.date,
               updatedAt: new Date().toISOString()
             };
             await actions.updateItem('rawMaterials', updatedMaterial);
           } else {
-            // Create new raw material
+            // Different price OR new material - create new stock entry
             const newMaterial = {
               name: item.materialName,
               category: item.materialCategory,
               unit: item.unit,
               quantity: item.quantity,
               pricePerUnit: item.pricePerUnit,
+              purchaseDate: formData.date,
               minStock: 10, // Default minimum stock
               supplierId: parseInt(formData.supplierId),
               supplierName: supplier.name,
-              description: `Auto-created from purchase on ${formData.date}`,
+              description: `Purchased on ${formData.date} @ NPR ${item.pricePerUnit}/${item.unit}`,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             };

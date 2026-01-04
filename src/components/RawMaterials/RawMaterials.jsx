@@ -224,7 +224,7 @@ export default function RawMaterials() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Price/Unit:</span>
-                      <span className="font-medium">NPR {material.pricePerUnit}</span>
+                      <span className="font-medium">NPR {(material.pricePerUnit || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-600">Min Stock:</span>
@@ -234,9 +234,14 @@ export default function RawMaterials() {
                       <span className="text-gray-600">Total Value:</span>
                       <span className="font-semibold">NPR {totalValue.toLocaleString()}</span>
                     </div>
-                    {material.supplier && (
+                    {material.purchaseDate && (
+                      <div className="text-xs text-gray-500">
+                        Purchased: {new Date(material.purchaseDate).toLocaleDateString()}
+                      </div>
+                    )}
+                    {(material.supplier || material.supplierName) && (
                       <div className="text-sm text-gray-600 pt-2">
-                        <span className="font-medium">Supplier:</span> {material.supplier}
+                        <span className="font-medium">Supplier:</span> {material.supplier || material.supplierName}
                       </div>
                     )}
                   </div>

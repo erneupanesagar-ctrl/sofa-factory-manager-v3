@@ -24,7 +24,8 @@ export default function Production() {
     orderId: null,
     sofaModelId: null,
     quantity: '',
-    notes: ''
+    notes: '',
+    billOfMaterials: []
   });
   const [materialValidation, setMaterialValidation] = useState(null);
 
@@ -92,11 +93,25 @@ export default function Production() {
   // Handle product selection and validate materials
   const handleProductChange = (sofaModelId) => {
     const numericId = parseInt(sofaModelId);
-    setFormData({ ...formData, sofaModelId: numericId });
+    const product = sofaModels.find(p => p.id === numericId);
+    
+    setFormData({ 
+      ...formData, 
+      sofaModelId: numericId,
+      billOfMaterials: product?.billOfMaterials || []
+    });
+    
     if (numericId && formData.quantity) {
       const validation = validateMaterials(numericId, formData.quantity);
       setMaterialValidation(validation);
     }
+  };
+
+  const calculateMaterialCostFromBOM = () => {
+    if (formData.billOfMaterials && formData.billOfMaterials.length > 0) {
+      return formData.billOfMaterials.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+    }
+    return 0;
   };
 
   const handleQuantityChange = (quantity) => {
@@ -113,7 +128,8 @@ export default function Production() {
       orderId: null,
       sofaModelId: null,
       quantity: '',
-      notes: ''
+      notes: '',
+      billOfMaterials: []
     });
     setMaterialValidation(null);
     setIsDialogOpen(true);
@@ -126,7 +142,8 @@ export default function Production() {
       orderId: null,
       sofaModelId: null,
       quantity: '',
-      notes: ''
+      notes: '',
+      billOfMaterials: []
     });
     setMaterialValidation(null);
   };
@@ -150,6 +167,15 @@ export default function Production() {
       const product = sofaModels.find(p => p.id === parseInt(formData.sofaModelId));
       const productionNumber = `PROD-${Date.now().toString().slice(-6)}`;
       
+      // AUTOMATION: Update the product's BOM if it was changed in the production dialog
+      if (product && JSON.stringify(product.billOfMaterials) !== JSON.stringify(formData.billOfMaterials)) {
+        await actions.updateItem('sofaModels', {
+          ...product,
+          billOfMaterials: formData.billOfMaterials,
+          materialCost: calculateMaterialCostFromBOM()
+        });
+      }
+
       const productionData = {
         productionNumber,
         productionType: formData.productionType,
@@ -157,7 +183,7 @@ export default function Production() {
         sofaModelId: parseInt(formData.sofaModelId),
         productName: product.name,
         quantity: parseInt(formData.quantity),
-        billOfMaterials: product.billOfMaterials || [],
+        billOfMaterials: formData.billOfMaterials,
         materialsNeeded: validation.materials,
         status: 'in_progress',
         startDate: new Date().toISOString(),
@@ -647,42 +673,175 @@ export default function Production() {
                 />
               </div>
 
+              {/* Bill of Materials Section */}
+              <div className="space-y-3 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-base font-semibold">Bill of Materials (BOM)</Label>
+                    <p className="text-xs text-gray-500 mt-1">Adjust materials needed for this production</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        billOfMaterials: [
+                          ...formData.billOfMaterials,
+                          {
+                            id: Date.now(),
+                            materialId: '',
+                            materialName: '',
+                            quantity: '',
+                            unit: '',
+                            costPerUnit: 0,
+                            totalCost: 0
+                          }
+                        ]
+                      });
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add Material
+                  </Button>
+                </div>
+
+                {formData.billOfMaterials.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 text-sm">
+                    No materials added yet. Click "Add Material" to build the BOM.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {formData.billOfMaterials.map((material, index) => {
+                      const rawMaterial = rawMaterials.find(rm => rm.id === parseInt(material.materialId));
+                      const totalCost = (parseFloat(material.quantity) || 0) * (rawMaterial?.costPerUnit || 0);
+                      
+                      return (
+                        <div key={material.id} className="p-3 bg-white border rounded-lg">
+                          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                            <div className="md:col-span-2">
+                              <Label className="text-xs">Material</Label>
+                              <select
+                                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
+                                value={material.materialId}
+                                onChange={(e) => {
+                                  const selectedMaterial = rawMaterials.find(rm => rm.id === parseInt(e.target.value));
+                                  const newBOM = [...formData.billOfMaterials];
+                                  newBOM[index] = {
+                                    ...newBOM[index],
+                                    materialId: e.target.value,
+                                    materialName: selectedMaterial?.name || '',
+                                    unit: selectedMaterial?.unit || '',
+                                    costPerUnit: selectedMaterial?.costPerUnit || 0
+                                  };
+                                  setFormData({ ...formData, billOfMaterials: newBOM });
+                                }}
+                              >
+                                <option value="">Select material...</option>
+                                {rawMaterials.map(rm => (
+                                  <option key={rm.id} value={rm.id}>
+                                    {rm.name} (NPR {rm.costPerUnit}/{rm.unit})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Quantity</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                className="mt-1"
+                                value={material.quantity}
+                                onChange={(e) => {
+                                  const newBOM = [...formData.billOfMaterials];
+                                  newBOM[index] = {
+                                    ...newBOM[index],
+                                    quantity: e.target.value,
+                                    totalCost: (parseFloat(e.target.value) || 0) * (rawMaterial?.costPerUnit || 0)
+                                  };
+                                  setFormData({ ...formData, billOfMaterials: newBOM });
+                                  
+                                  // Re-validate materials when BOM quantity changes
+                                  if (formData.sofaModelId) {
+                                    const validation = validateMaterials(formData.sofaModelId, formData.quantity);
+                                    setMaterialValidation(validation);
+                                  }
+                                }}
+                                placeholder="0"
+                              />
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs">Unit</Label>
+                              <Input
+                                type="text"
+                                className="mt-1 bg-gray-100"
+                                value={material.unit}
+                                readOnly
+                                placeholder="-"
+                              />
+                            </div>
+                            
+                            <div className="flex items-end gap-2">
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  const newBOM = formData.billOfMaterials.filter((_, i) => i !== index);
+                                  setFormData({
+                                    ...formData,
+                                    billOfMaterials: newBOM
+                                  });
+                                  // Re-validate
+                                  if (formData.sofaModelId) {
+                                    const validation = validateMaterials(formData.sofaModelId, formData.quantity);
+                                    setMaterialValidation(validation);
+                                  }
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-blue-900">Total Material Cost (per unit)</span>
+                        <span className="text-lg font-bold text-blue-900">
+                          {formatCurrency(calculateMaterialCostFromBOM())}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Material Validation */}
               {materialValidation && (
-                <div className={`p-4 rounded-lg border-2 ${materialValidation.valid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                  <div className="flex items-center gap-2 mb-3">
+                <div className={`p-4 rounded-lg ${materialValidation.valid ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                  <div className="flex items-center gap-2 mb-2">
                     {materialValidation.valid ? (
                       <CheckCircle className="w-5 h-5 text-green-600" />
                     ) : (
                       <AlertTriangle className="w-5 h-5 text-red-600" />
                     )}
-                    <h4 className={`font-semibold ${materialValidation.valid ? 'text-green-900' : 'text-red-900'}`}>
+                    <span className={`font-semibold ${materialValidation.valid ? 'text-green-800' : 'text-red-800'}`}>
                       {materialValidation.message}
-                    </h4>
+                    </span>
                   </div>
-
                   <div className="space-y-2">
-                    {materialValidation.materials.map((material, index) => (
-                      <div key={index} className={`p-3 rounded-lg ${material.isAvailable ? 'bg-white border border-green-200' : 'bg-red-100 border border-red-300'}`}>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{material.materialName}</p>
-                            <p className="text-sm text-gray-600">
-                              Need: {material.requiredQty} {material.unit} | 
-                              Available: {material.availableQty} {material.unit}
-                            </p>
-                          </div>
-                          {material.isAvailable ? (
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                          ) : (
-                            <div className="text-right">
-                              <XCircle className="w-5 h-5 text-red-600 mb-1" />
-                              <p className="text-xs text-red-600 font-semibold">
-                                Short: {material.shortage} {material.unit}
-                              </p>
-                            </div>
-                          )}
-                        </div>
+                    {materialValidation.materials.map((m, idx) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span>{m.materialName}</span>
+                        <span className={m.isAvailable ? 'text-green-700' : 'text-red-700 font-bold'}>
+                          {m.requiredQty} {m.unit} (Available: {m.availableQty})
+                        </span>
                       </div>
                     ))}
                   </div>

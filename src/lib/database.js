@@ -153,6 +153,7 @@ class SofaFactoryDB {
 
   // Generic CRUD operations
   async add(storeName, data) {
+    if (!this.db) await this.init();
     const transaction = this.db.transaction([storeName], 'readwrite');
     const store = transaction.objectStore(storeName);
     
@@ -172,6 +173,7 @@ class SofaFactoryDB {
   }
 
   async get(storeName, id) {
+    if (!this.db) await this.init();
     const transaction = this.db.transaction([storeName], 'readonly');
     const store = transaction.objectStore(storeName);
     
@@ -183,6 +185,7 @@ class SofaFactoryDB {
   }
 
   async getAll(storeName, indexName = null, value = null) {
+    if (!this.db) await this.init();
     const transaction = this.db.transaction([storeName], 'readonly');
     const store = transaction.objectStore(storeName);
     
@@ -201,6 +204,7 @@ class SofaFactoryDB {
   }
 
   async update(storeName, data) {
+    if (!this.db) await this.init();
     const transaction = this.db.transaction([storeName], 'readwrite');
     const store = transaction.objectStore(storeName);
     
@@ -218,6 +222,7 @@ class SofaFactoryDB {
   }
 
   async delete(storeName, id) {
+    if (!this.db) await this.init();
     const transaction = this.db.transaction([storeName], 'readwrite');
     const store = transaction.objectStore(storeName);
     
@@ -242,6 +247,7 @@ class SofaFactoryDB {
       synced: false
     };
 
+    if (!this.db) await this.init();
     const transaction = this.db.transaction(['syncRecords'], 'readwrite');
     const store = transaction.objectStore('syncRecords');
     

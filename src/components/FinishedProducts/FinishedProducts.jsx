@@ -504,158 +504,28 @@ export default function FinishedProducts() {
                 </div>
               </div>
 
-              {/* Bill of Materials Section */}
-              <div className="space-y-3 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label className="text-base font-semibold">Bill of Materials (BOM)</Label>
-                    <p className="text-xs text-gray-500 mt-1">Add materials needed to produce this product</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        billOfMaterials: [
-                          ...formData.billOfMaterials,
-                          {
-                            id: Date.now(),
-                            materialId: '',
-                            materialName: '',
-                            quantity: '',
-                            unit: '',
-                            costPerUnit: 0,
-                            totalCost: 0
-                          }
-                        ]
-                      });
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-1" />
-                    Add Material
-                  </Button>
-                </div>
-
-                {formData.billOfMaterials.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 text-sm">
-                    No materials added yet. Click "Add Material" to start building your BOM.
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {formData.billOfMaterials.map((material, index) => {
-                      const rawMaterial = state.rawMaterials.find(rm => rm.id === parseInt(material.materialId));
-                      const totalCost = (parseFloat(material.quantity) || 0) * (rawMaterial?.costPerUnit || 0);
-                      
-                      return (
-                        <div key={material.id} className="p-3 bg-white border rounded-lg">
-                          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                            <div className="md:col-span-2">
-                              <Label className="text-xs">Material</Label>
-                              <select
-                                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                                value={material.materialId}
-                                onChange={(e) => {
-                                  const selectedMaterial = state.rawMaterials.find(rm => rm.id === parseInt(e.target.value));
-                                  const newBOM = [...formData.billOfMaterials];
-                                  newBOM[index] = {
-                                    ...newBOM[index],
-                                    materialId: e.target.value,
-                                    materialName: selectedMaterial?.name || '',
-                                    unit: selectedMaterial?.unit || '',
-                                    costPerUnit: selectedMaterial?.costPerUnit || 0
-                                  };
-                                  setFormData({ ...formData, billOfMaterials: newBOM });
-                                }}
-                              >
-                                <option value="">Select material...</option>
-                                {state.rawMaterials.map(rm => (
-                                  <option key={rm.id} value={rm.id}>
-                                    {rm.name} (NPR {rm.costPerUnit}/{rm.unit})
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            
-                            <div>
-                              <Label className="text-xs">Quantity</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                className="mt-1"
-                                value={material.quantity}
-                                onChange={(e) => {
-                                  const newBOM = [...formData.billOfMaterials];
-                                  newBOM[index] = {
-                                    ...newBOM[index],
-                                    quantity: e.target.value,
-                                    totalCost: (parseFloat(e.target.value) || 0) * (rawMaterial?.costPerUnit || 0)
-                                  };
-                                  setFormData({ ...formData, billOfMaterials: newBOM });
-                                }}
-                                placeholder="0"
-                              />
-                            </div>
-                            
-                            <div>
-                              <Label className="text-xs">Unit</Label>
-                              <Input
-                                type="text"
-                                className="mt-1 bg-gray-100"
-                                value={material.unit}
-                                readOnly
-                                placeholder="-"
-                              />
-                            </div>
-                            
-                            <div className="flex items-end gap-2">
-                              <div className="flex-1">
-                                <Label className="text-xs">Total Cost</Label>
-                                <Input
-                                  type="text"
-                                  className="mt-1 bg-gray-100 font-semibold"
-                                  value={formatCurrency(totalCost)}
-                                  readOnly
-                                />
-                              </div>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => {
-                                  setFormData({
-                                    ...formData,
-                                    billOfMaterials: formData.billOfMaterials.filter((_, i) => i !== index)
-                                  });
-                                }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-blue-900">Total Material Cost (from BOM)</span>
-                        <span className="text-lg font-bold text-blue-900">
-                          {formatCurrency(calculateMaterialCostFromBOM())}
-                        </span>
+              {/* BOM Info Section (Read Only) */}
+              <div className="p-4 border rounded-lg bg-blue-50">
+                <Label className="text-base font-semibold text-blue-900">Bill of Materials (BOM)</Label>
+                <p className="text-xs text-blue-700 mt-1 mb-3">BOM is now managed in the <strong>Production</strong> section when starting a new job.</p>
+                
+                {formData.billOfMaterials.length > 0 ? (
+                  <div className="space-y-1">
+                    {formData.billOfMaterials.map((m, i) => (
+                      <div key={i} className="flex justify-between text-sm text-blue-800">
+                        <span>{m.materialName}</span>
+                        <span>{m.quantity} {m.unit}</span>
                       </div>
+                    ))}
+                    <div className="pt-2 mt-2 border-t border-blue-200 flex justify-between font-bold text-blue-900">
+                      <span>Total Material Cost</span>
+                      <span>{formatCurrency(calculateMaterialCostFromBOM())}</span>
                     </div>
                   </div>
+                ) : (
+                  <p className="text-sm text-blue-600 italic">No BOM defined for this product yet.</p>
                 )}
               </div>
-
-              {/* Manual Material Cost (only if no BOM) */}
-              {formData.billOfMaterials.length === 0 && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-xs text-yellow-800 mb-2">💡 <strong>Tip:</strong> Use Bill of Materials above for accurate material tracking, or enter manual cost below.</p>
-                </div>
-              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">

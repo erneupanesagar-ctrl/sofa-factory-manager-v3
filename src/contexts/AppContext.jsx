@@ -189,14 +189,14 @@ function appReducer(state, action) {
       const { collection, item } = action.payload;
       return {
         ...state,
-        [collection]: [...state[collection], item]
+        [collection]: [...(state[collection] || []), item]
       };
       
     case ActionTypes.UPDATE_ITEM:
       const { collection: updateCollection, item: updateItem } = action.payload;
       return {
         ...state,
-        [updateCollection]: state[updateCollection].map(existing => 
+        [updateCollection]: (state[updateCollection] || []).map(existing => 
           existing.id === updateItem.id ? updateItem : existing
         )
       };
@@ -205,7 +205,7 @@ function appReducer(state, action) {
       const { collection: deleteCollection, id } = action.payload;
       return {
         ...state,
-        [deleteCollection]: state[deleteCollection].filter(item => item.id !== id)
+        [deleteCollection]: (state[deleteCollection] || []).filter(item => item.id !== id)
       };
       
     case ActionTypes.SET_SIDEBAR_OPEN:
@@ -562,16 +562,16 @@ export function AppProvider({ children }) {
     // Company and Locations actions
     updateCompany: async (companyData) => {
       try {
-        const companies = await db.getAll('companies');
-        if (companies.length > 0) {
-          const company = companies[0];
-          const updatedCompany = { ...company, ...companyData };
-          await db.update('companies', updatedCompany);
+        // Company profile always uses 'profile' as the ID
+        const existingCompany = await db.get('company', 'profile');
+        if (existingCompany) {
+          const updatedCompany = { ...existingCompany, ...companyData, id: 'profile' };
+          await db.update('company', updatedCompany);
           dispatch({ type: ActionTypes.SET_COMPANY, payload: updatedCompany });
           return updatedCompany;
         } else {
-          const id = await db.add('companies', companyData);
-          const newCompany = await db.get('companies', id);
+          const newCompany = { ...companyData, id: 'profile' };
+          await db.add('company', newCompany);
           dispatch({ type: ActionTypes.SET_COMPANY, payload: newCompany });
           return newCompany;
         }

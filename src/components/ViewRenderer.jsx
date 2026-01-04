@@ -17,7 +17,7 @@ import Suppliers from './Suppliers/Suppliers';
 import Purchases from './Purchases/Purchases';
 import Financials from './Financials/Financials';
 import Reports from './Reports/Reports';
-import Production from './Production/Production';
+// Production section merged into Orders
 import NotificationSettings from './Notifications/NotificationSettings';
 import NotificationQueue from './Notifications/NotificationQueue';
 
@@ -130,9 +130,7 @@ export default function ViewRenderer() {
     case 'orders':
       return <Orders />;
       
-    case 'production':
-      return <Production />;
-      
+
     case 'reports':
       return <Reports />;
       

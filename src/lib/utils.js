@@ -203,28 +203,34 @@ export function getPaymentStatusColor(status) {
   }
 }
 
-// Order Statuses
+// Order Statuses (Updated workflow: Stock Orders and Customer Orders)
 export const OrderStatuses = {
   PENDING_APPROVAL: { value: 'pending_approval', label: 'Pending Approval', color: 'orange' },
-  QUEUED: { value: 'queued_for_production', label: 'Queued for Production', color: 'yellow' },
-  IN_CONSTRUCTION: { value: 'in_construction', label: 'In Construction', color: 'blue' },
-  PENDING_INSPECTION: { value: 'pending_final_inspection', label: 'Pending Final Inspection', color: 'purple' },
+  APPROVED: { value: 'approved', label: 'Approved', color: 'blue' },
+  IN_PRODUCTION: { value: 'in_production', label: 'In Production', color: 'purple' },
   COMPLETED: { value: 'completed', label: 'Completed', color: 'green' },
+  READY_FOR_DELIVERY: { value: 'ready_for_delivery', label: 'Ready for Delivery', color: 'orange' },
+  DELIVERED: { value: 'delivered', label: 'Delivered', color: 'emerald' },
+  CANCELLED: { value: 'cancelled', label: 'Cancelled', color: 'red' },
 };
 
 // Get order status color
 export function getOrderStatusColor(status) {
   switch (status) {
+    case OrderStatuses.PENDING_APPROVAL.value:
+      return 'text-yellow-600 bg-yellow-100';
+    case OrderStatuses.APPROVED.value:
+      return 'text-blue-600 bg-blue-100';
+    case OrderStatuses.IN_PRODUCTION.value:
+      return 'text-purple-600 bg-purple-100';
     case OrderStatuses.COMPLETED.value:
       return 'text-green-600 bg-green-100';
-    case OrderStatuses.PENDING_APPROVAL.value:
+    case OrderStatuses.READY_FOR_DELIVERY.value:
       return 'text-orange-600 bg-orange-100';
-    case OrderStatuses.QUEUED.value:
-      return 'text-yellow-600 bg-yellow-100';
-    case OrderStatuses.IN_CONSTRUCTION.value:
-      return 'text-blue-600 bg-blue-100';
-    case OrderStatuses.PENDING_INSPECTION.value:
-      return 'text-purple-600 bg-purple-100';
+    case OrderStatuses.DELIVERED.value:
+      return 'text-emerald-600 bg-emerald-100';
+    case OrderStatuses.CANCELLED.value:
+      return 'text-red-600 bg-red-100';
     default:
       return 'text-gray-600 bg-gray-100';
   }
@@ -356,24 +362,30 @@ Thank you.
 ${companyInfo.phone}`;
   },
 
-  // Order Status Notifications
+  // Order Status Notifications (Updated for Stock/Customer order workflow)
   orderStatus: (companyInfo, customerName, orderId, newStatus) => {
     let messageBody = '';
     switch (newStatus) {
       case OrderStatuses.PENDING_APPROVAL.value:
-        messageBody = `Your order #${orderId} has been received and is awaiting final approval. We will notify you when it is queued for production.`;
+        messageBody = `Your order #${orderId} has been received and is awaiting approval. We will notify you when production begins.`;
         break;
-      case OrderStatuses.QUEUED.value:
-        messageBody = `Great news, ${customerName}! Your order #${orderId} has been approved and is now queued for production. We will begin construction soon.`;
+      case OrderStatuses.APPROVED.value:
+        messageBody = `Great news, ${customerName}! Your order #${orderId} has been approved and will enter production soon.`;
         break;
-      case OrderStatuses.IN_CONSTRUCTION.value:
-        messageBody = `Production has started! Your order #${orderId} is now in construction. We are working hard to craft your items.`;
-        break;
-      case OrderStatuses.PENDING_INSPECTION.value:
-        messageBody = `Your order #${orderId} is complete and is now undergoing final quality inspection. We will notify you when it is ready for delivery.`;
+      case OrderStatuses.IN_PRODUCTION.value:
+        messageBody = `Production has started! Your order #${orderId} is now being crafted. We are working hard to complete your items.`;
         break;
       case OrderStatuses.COMPLETED.value:
-        messageBody = `Congratulations, ${customerName}! Your order #${orderId} is complete and ready for delivery/pickup. Please contact us to arrange the final steps.`;
+        messageBody = `Your order #${orderId} production is complete! We will prepare it for delivery soon.`;
+        break;
+      case OrderStatuses.READY_FOR_DELIVERY.value:
+        messageBody = `Congratulations, ${customerName}! Your order #${orderId} is ready for delivery. Please contact us to arrange delivery.`;
+        break;
+      case OrderStatuses.DELIVERED.value:
+        messageBody = `Your order #${orderId} has been delivered successfully. Thank you for choosing us!`;
+        break;
+      case OrderStatuses.CANCELLED.value:
+        messageBody = `Your order #${orderId} has been cancelled. Please contact us if you have any questions.`;
         break;
       default:
         messageBody = `The status of your order #${orderId} has been updated to "${newStatus}".`;

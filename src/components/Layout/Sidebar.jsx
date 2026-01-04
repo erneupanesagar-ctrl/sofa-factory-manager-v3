@@ -86,12 +86,7 @@ const navigationItems = [
     icon: ShoppingCart,
     roles: ['admin', 'staff']
   },
-  {
-    id: 'production',
-    label: 'Production',
-    icon: Factory,
-    roles: ['admin', 'staff', 'labour_manager']
-  },
+
   {
     id: 'reports',
     label: 'Reports',

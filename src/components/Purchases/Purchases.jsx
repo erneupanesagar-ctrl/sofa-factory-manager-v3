@@ -336,7 +336,7 @@ export default function Purchases() {
             const updatedMaterial = {
               ...existingMaterial,
               quantity: (parseFloat(existingMaterial.quantity) || 0) + quantityDiff,
-              unitPrice: item.pricePerUnit
+              pricePerUnit: item.pricePerUnit
             };
             await actions.updateItem('rawMaterials', updatedMaterial);
           }
@@ -358,7 +358,7 @@ export default function Purchases() {
             const updatedMaterial = {
               ...existingMaterial,
               quantity: (parseFloat(existingMaterial.quantity) || 0) + item.quantity,
-              unitPrice: item.pricePerUnit,
+              pricePerUnit: item.pricePerUnit,
               updatedAt: new Date().toISOString()
             };
             await actions.updateItem('rawMaterials', updatedMaterial);
@@ -369,7 +369,7 @@ export default function Purchases() {
               category: item.materialCategory,
               unit: item.unit,
               quantity: item.quantity,
-              unitPrice: item.pricePerUnit,
+              pricePerUnit: item.pricePerUnit,
               minStock: 10, // Default minimum stock
               supplierId: parseInt(formData.supplierId),
               supplierName: supplier.name,

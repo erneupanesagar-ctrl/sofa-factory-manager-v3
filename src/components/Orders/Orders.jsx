@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../contexts/AppContext';
-import { Plus, Search, Eye, MessageCircle, ChevronRight, Package, Truck, Camera, Trash2, X } from 'lucide-react';
+import { Plus, Search, Eye, MessageCircle, ChevronRight, Package, Truck, Camera, Trash2, X, AlertTriangle, CheckCircle, ShoppingCart, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDate, generateWhatsAppURL, NotificationTemplates } from '../../lib/utils';
+import database from '../../lib/database';
 
 // Order Statuses
 const OrderStatuses = {
@@ -23,14 +24,14 @@ const OrderStatuses = {
   CANCELLED: { value: 'cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-800' }
 };
 
-// Material categories and units
-const materialCategories = ['Wood', 'Fabric', 'Foam', 'Metal', 'Leather', 'Springs', 'Webbing', 'Thread', 'General'];
+// Material units
 const materialUnits = ['Pieces', 'Meters', 'Feet', 'Yards', 'Sq.Ft', 'Sq.M', 'Kg', 'Grams', 'Liters', 'Sheets', 'Rolls', 'Sets'];
 
 export default function Orders() {
   const { state, actions } = useApp();
   const { customers, rawMaterials, sofaModels, company } = state;
   const [orders, setOrders] = useState([]);
+  const [labourers, setLabourers] = useState([]);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -51,7 +52,8 @@ export default function Orders() {
     unitPrice: '',
     notes: '',
     dueDate: '',
-    bom: [] // Bill of Materials
+    bom: [], // Bill of Materials
+    labourCosts: [] // Labour costs
   });
 
   // Completion form state (for stock orders)
@@ -69,17 +71,21 @@ export default function Orders() {
     deliveryPhotoPreview: ''
   });
 
-  // Load orders from database
-  React.useEffect(() => {
-    const loadOrders = async () => {
+  // Load orders and labourers from database
+  useEffect(() => {
+    const loadData = async () => {
       try {
-        const allOrders = await actions.getAllOrders();
+        const [allOrders, allLabourers] = await Promise.all([
+          actions.getAllOrders(),
+          database.getAll('labourers')
+        ]);
         setOrders(allOrders || []);
+        setLabourers((allLabourers || []).filter(l => l.status === 'active'));
       } catch (error) {
-        console.error('Error loading orders:', error);
+        console.error('Error loading data:', error);
       }
     };
-    loadOrders();
+    loadData();
   }, []);
 
   const filteredOrders = orders.filter(order => {
@@ -94,6 +100,51 @@ export default function Orders() {
     return matchesSearch && matchesStatus && matchesType;
   });
 
+  // Get stock status for a material
+  const getMaterialStockStatus = (materialId, requiredQty) => {
+    const material = (rawMaterials || []).find(m => m.id === parseInt(materialId));
+    if (!material) return { status: 'not_found', available: 0, shortage: requiredQty };
+    
+    const available = parseFloat(material.quantity) || 0;
+    const required = parseFloat(requiredQty) || 0;
+    
+    if (available >= required) {
+      return { status: 'in_stock', available, shortage: 0, material };
+    } else if (available > 0) {
+      return { status: 'low_stock', available, shortage: required - available, material };
+    } else {
+      return { status: 'out_of_stock', available: 0, shortage: required, material };
+    }
+  };
+
+  // Calculate total BOM cost
+  const calculateBomCost = () => {
+    return formData.bom.reduce((total, item) => {
+      const material = (rawMaterials || []).find(m => m.id === parseInt(item.materialId));
+      if (material) {
+        const qty = parseFloat(item.quantity) || 0;
+        const price = parseFloat(material.pricePerUnit) || 0;
+        return total + (qty * price);
+      }
+      return total;
+    }, 0);
+  };
+
+  // Calculate total labour cost
+  const calculateLabourCost = () => {
+    return formData.labourCosts.reduce((total, item) => {
+      return total + (parseFloat(item.cost) || 0);
+    }, 0);
+  };
+
+  // Calculate total order cost
+  const calculateTotalCost = () => {
+    const bomCost = calculateBomCost();
+    const labourCost = calculateLabourCost();
+    const quantity = parseInt(formData.quantity) || 1;
+    return (bomCost + labourCost) * quantity;
+  };
+
   const handleOpenDialog = () => {
     setFormData({
       orderType: 'customer',
@@ -103,7 +154,8 @@ export default function Orders() {
       unitPrice: '',
       notes: '',
       dueDate: '',
-      bom: []
+      bom: [],
+      labourCosts: []
     });
     setIsDialogOpen(true);
   };
@@ -112,11 +164,42 @@ export default function Orders() {
     setIsDialogOpen(false);
   };
 
-  // BOM Management
+  // BOM Management - Add from inventory
   const handleAddBomItem = () => {
     setFormData({
       ...formData,
-      bom: [...formData.bom, { materialName: '', category: 'General', unit: 'Pieces', quantity: 1 }]
+      bom: [...formData.bom, { 
+        materialId: '', 
+        materialName: '',
+        category: '',
+        unit: 'Pieces', 
+        quantity: 1,
+        availableStock: 0,
+        pricePerUnit: 0,
+        isOutOfStock: false,
+        needToPurchase: false,
+        purchaseNote: ''
+      }]
+    });
+  };
+
+  // Add custom material (not in inventory)
+  const handleAddCustomMaterial = () => {
+    setFormData({
+      ...formData,
+      bom: [...formData.bom, { 
+        materialId: 'custom', 
+        materialName: '',
+        category: 'Custom',
+        unit: 'Pieces', 
+        quantity: 1,
+        availableStock: 0,
+        pricePerUnit: 0,
+        isOutOfStock: true,
+        needToPurchase: true,
+        purchaseNote: '',
+        estimatedCost: ''
+      }]
     });
   };
 
@@ -128,7 +211,89 @@ export default function Orders() {
   const handleBomItemChange = (index, field, value) => {
     const newBom = [...formData.bom];
     newBom[index] = { ...newBom[index], [field]: value };
+    
+    // If material is selected from inventory, update related fields
+    if (field === 'materialId' && value !== 'custom') {
+      const material = (rawMaterials || []).find(m => m.id === parseInt(value));
+      if (material) {
+        newBom[index] = {
+          ...newBom[index],
+          materialName: material.name,
+          category: material.category || 'General',
+          unit: material.unit || 'Pieces',
+          availableStock: parseFloat(material.quantity) || 0,
+          pricePerUnit: parseFloat(material.pricePerUnit) || 0,
+          isOutOfStock: (parseFloat(material.quantity) || 0) === 0,
+          needToPurchase: false
+        };
+      }
+    }
+    
+    // Check stock status when quantity changes
+    if (field === 'quantity' && newBom[index].materialId !== 'custom') {
+      const material = (rawMaterials || []).find(m => m.id === parseInt(newBom[index].materialId));
+      if (material) {
+        const required = parseFloat(value) || 0;
+        const available = parseFloat(material.quantity) || 0;
+        newBom[index].isOutOfStock = available < required;
+        newBom[index].shortage = Math.max(0, required - available);
+      }
+    }
+    
     setFormData({ ...formData, bom: newBom });
+  };
+
+  // Labour Cost Management
+  const handleAddLabourCost = () => {
+    setFormData({
+      ...formData,
+      labourCosts: [...formData.labourCosts, {
+        labourerId: '',
+        labourerName: '',
+        workType: '',
+        hoursEstimated: '',
+        ratePerHour: '',
+        cost: ''
+      }]
+    });
+  };
+
+  const handleRemoveLabourCost = (index) => {
+    const newLabourCosts = formData.labourCosts.filter((_, i) => i !== index);
+    setFormData({ ...formData, labourCosts: newLabourCosts });
+  };
+
+  const handleLabourCostChange = (index, field, value) => {
+    const newLabourCosts = [...formData.labourCosts];
+    newLabourCosts[index] = { ...newLabourCosts[index], [field]: value };
+    
+    // If labourer is selected, update related fields
+    if (field === 'labourerId') {
+      const labourer = labourers.find(l => l.id === parseInt(value));
+      if (labourer) {
+        newLabourCosts[index] = {
+          ...newLabourCosts[index],
+          labourerName: labourer.name,
+          ratePerHour: (parseFloat(labourer.dailyWage) / 8).toFixed(2), // Assuming 8-hour workday
+          specialization: labourer.specialization
+        };
+        // Recalculate cost if hours are set
+        if (newLabourCosts[index].hoursEstimated) {
+          const hours = parseFloat(newLabourCosts[index].hoursEstimated) || 0;
+          const rate = parseFloat(newLabourCosts[index].ratePerHour) || 0;
+          newLabourCosts[index].cost = (hours * rate).toFixed(2);
+        }
+      }
+    }
+    
+    // Recalculate cost when hours or rate changes
+    if (field === 'hoursEstimated' || field === 'ratePerHour') {
+      const hours = parseFloat(field === 'hoursEstimated' ? value : newLabourCosts[index].hoursEstimated) || 0;
+      const rate = parseFloat(field === 'ratePerHour' ? value : newLabourCosts[index].ratePerHour) || 0;
+      newLabourCosts[index].cost = (hours * rate).toFixed(2);
+    }
+    
+    setFormData({ ...formData, labourCosts: newLabourCosts });
   };
 
   const handleSubmit = async (e) => {
@@ -149,6 +314,9 @@ export default function Orders() {
       return;
     }
 
+    // Check for materials that need to be purchased
+    const materialsNeedingPurchase = formData.bom.filter(item => item.needToPurchase || item.isOutOfStock);
+    
     try {
       const quantity = parseInt(formData.quantity) || 1;
       const unitPrice = parseFloat(formData.unitPrice) || 0;
@@ -169,6 +337,11 @@ export default function Orders() {
         };
       }
 
+      // Calculate costs
+      const materialCost = calculateBomCost();
+      const labourCost = calculateLabourCost();
+      const totalProductionCost = (materialCost + labourCost) * quantity;
+
       const orderData = {
         orderNumber,
         orderType: formData.orderType,
@@ -177,10 +350,25 @@ export default function Orders() {
         quantity,
         unitPrice,
         totalAmount: unitPrice * quantity,
+        materialCost: materialCost * quantity,
+        labourCost: labourCost * quantity,
+        totalProductionCost,
         bom: formData.bom.map(item => ({
           ...item,
           quantity: parseFloat(item.quantity) || 0,
           totalNeeded: (parseFloat(item.quantity) || 0) * quantity
+        })),
+        labourCosts: formData.labourCosts.map(item => ({
+          ...item,
+          totalCost: (parseFloat(item.cost) || 0) * quantity
+        })),
+        materialsNeedingPurchase: materialsNeedingPurchase.map(item => ({
+          materialName: item.materialName,
+          quantityNeeded: (parseFloat(item.quantity) || 0) * quantity,
+          shortage: (item.shortage || item.quantity) * quantity,
+          unit: item.unit,
+          purchaseNote: item.purchaseNote,
+          estimatedCost: item.estimatedCost
         })),
         status: OrderStatuses.PENDING_APPROVAL.value,
         notes: formData.notes,
@@ -196,7 +384,14 @@ export default function Orders() {
 
       const newOrder = await actions.addItem('orders', orderData);
       setOrders([...orders, newOrder]);
-      alert('Order created successfully!');
+      
+      // Show warning if materials need to be purchased
+      if (materialsNeedingPurchase.length > 0) {
+        alert(`Order created successfully!\n\nNote: ${materialsNeedingPurchase.length} material(s) need to be purchased before production can start.`);
+      } else {
+        alert('Order created successfully!');
+      }
+      
       handleCloseDialog();
     } catch (error) {
       console.error('Error creating order:', error);
@@ -253,25 +448,21 @@ export default function Orders() {
     if (!order.bom || order.bom.length === 0) return;
 
     for (const bomItem of order.bom) {
-      // Find matching raw material by name and try to deduct
-      const matchingMaterials = (rawMaterials || []).filter(
-        m => m.name?.toLowerCase() === bomItem.materialName?.toLowerCase()
-      );
-
-      if (matchingMaterials.length > 0) {
-        let remainingToDeduct = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
+      // Skip custom materials (not in inventory)
+      if (bomItem.materialId === 'custom') continue;
+      
+      // Find matching raw material by ID
+      const material = (rawMaterials || []).find(m => m.id === parseInt(bomItem.materialId));
+      
+      if (material) {
+        const toDeduct = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
+        const newQuantity = Math.max(0, (parseFloat(material.quantity) || 0) - toDeduct);
         
-        for (const material of matchingMaterials) {
-          if (remainingToDeduct <= 0) break;
-          
-          const deductAmount = Math.min(material.quantity, remainingToDeduct);
-          const updatedMaterial = {
-            ...material,
-            quantity: material.quantity - deductAmount
-          };
-          await actions.updateItem('rawMaterials', updatedMaterial);
-          remainingToDeduct -= deductAmount;
-        }
+        const updatedMaterial = {
+          ...material,
+          quantity: newQuantity
+        };
+        await actions.updateItem('rawMaterials', updatedMaterial);
       }
     }
   };
@@ -282,13 +473,13 @@ export default function Orders() {
       category: 'Finished Product',
       stock: order.quantity,
       sellingPrice: parseFloat(completionData.sellingPrice) || 0,
-      productPhoto: completionData.productPhoto || null,
-      bom: order.bom,
-      createdFromOrder: order.orderNumber,
+      productionCost: order.totalProductionCost || 0,
+      photo: completionData.productPhotoPreview || null,
+      orderNumber: order.orderNumber,
       createdAt: new Date().toISOString()
     };
 
-    await actions.addItem('sofaModels', productData);
+    await actions.addItem('finishedProducts', productData);
   };
 
   const createSaleRecord = async (order, deliveryData) => {
@@ -300,12 +491,10 @@ export default function Orders() {
       quantity: order.quantity,
       unitPrice: order.unitPrice,
       totalAmount: order.totalAmount,
-      paymentMethod: 'pending',
-      paymentStatus: 'pending',
-      status: 'approved',
+      productionCost: order.totalProductionCost || 0,
+      profit: (order.totalAmount || 0) - (order.totalProductionCost || 0),
       orderNumber: order.orderNumber,
       deliveryNotes: deliveryData.deliveryNotes,
-      deliveryPhoto: deliveryData.deliveryPhoto,
       createdAt: new Date().toISOString()
     };
 
@@ -314,9 +503,39 @@ export default function Orders() {
 
   // Approval handler
   const handleApprove = async (order) => {
-    if (window.confirm('Approve this order and move to production queue?')) {
+    // Check if all materials are available
+    const unavailableMaterials = [];
+    for (const bomItem of (order.bom || [])) {
+      if (bomItem.materialId === 'custom') continue;
+      
+      const material = (rawMaterials || []).find(m => m.id === parseInt(bomItem.materialId));
+      if (!material) {
+        unavailableMaterials.push(`${bomItem.materialName} (not found)`);
+      } else {
+        const available = parseFloat(material.quantity) || 0;
+        const needed = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
+        if (available < needed) {
+          unavailableMaterials.push(`${bomItem.materialName}: Need ${needed}, Have ${available}`);
+        }
+      }
+    }
+
+    let confirmMessage = 'Approve this order and move to production queue?';
+    if (unavailableMaterials.length > 0) {
+      confirmMessage = `Warning: Some materials are insufficient:\n${unavailableMaterials.join('\n')}\n\nDo you still want to approve this order?`;
+    }
+
+    if (window.confirm(confirmMessage)) {
       await handleStatusUpdate(order, OrderStatuses.APPROVED.value);
       alert('Order approved!');
+    }
+  };
+
+  // Cancel handler
+  const handleCancelOrder = async (order) => {
+    if (window.confirm('Are you sure you want to cancel this order?')) {
+      await handleStatusUpdate(order, OrderStatuses.CANCELLED.value);
+      alert('Order cancelled.');
     }
   };
 
@@ -327,15 +546,26 @@ export default function Orders() {
     let missingMaterials = [];
 
     for (const bomItem of (order.bom || [])) {
-      const totalNeeded = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
-      const matchingMaterials = (rawMaterials || []).filter(
-        m => m.name?.toLowerCase() === bomItem.materialName?.toLowerCase()
-      );
-      const totalAvailable = matchingMaterials.reduce((sum, m) => sum + (m.quantity || 0), 0);
+      if (bomItem.materialId === 'custom') {
+        if (bomItem.needToPurchase) {
+          canStart = false;
+          missingMaterials.push(`${bomItem.materialName}: Custom material - needs to be purchased`);
+        }
+        continue;
+      }
       
-      if (totalAvailable < totalNeeded) {
+      const totalNeeded = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
+      const material = (rawMaterials || []).find(m => m.id === parseInt(bomItem.materialId));
+      
+      if (!material) {
         canStart = false;
-        missingMaterials.push(`${bomItem.materialName}: Need ${totalNeeded}, Have ${totalAvailable}`);
+        missingMaterials.push(`${bomItem.materialName}: Not found in inventory`);
+      } else {
+        const available = parseFloat(material.quantity) || 0;
+        if (available < totalNeeded) {
+          canStart = false;
+          missingMaterials.push(`${bomItem.materialName}: Need ${totalNeeded}, Have ${available}`);
+        }
       }
     }
 
@@ -417,27 +647,22 @@ export default function Orders() {
     }
   };
 
-  // Photo upload handlers
+  // Photo upload handler
   const handlePhotoUpload = (e, type) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('File size must be less than 5MB');
-        return;
-      }
-      
       const reader = new FileReader();
       reader.onloadend = () => {
         if (type === 'completion') {
           setCompletionData({
             ...completionData,
-            productPhoto: reader.result,
+            productPhoto: file,
             productPhotoPreview: reader.result
           });
         } else if (type === 'delivery') {
           setDeliveryData({
             ...deliveryData,
-            deliveryPhoto: reader.result,
+            deliveryPhoto: file,
             deliveryPhotoPreview: reader.result
           });
         }
@@ -446,24 +671,8 @@ export default function Orders() {
     }
   };
 
-  // Cancel order handler
-  const handleCancelOrder = async (order) => {
-    if (window.confirm('Are you sure you want to cancel this order?')) {
-      // If in production, restore materials
-      if (order.status === OrderStatuses.IN_PRODUCTION.value) {
-        // TODO: Restore materials logic
-      }
-      await handleStatusUpdate(order, OrderStatuses.CANCELLED.value);
-      alert('Order cancelled.');
-    }
-  };
-
-  const getStatusColor = (status) => {
-    const statusObj = Object.values(OrderStatuses).find(s => s.value === status);
-    return statusObj?.color || 'bg-gray-100 text-gray-800';
-  };
-
-  const getNextActions = (order) => {
+  // Get order actions based on status
+  const getOrderActions = (order) => {
     const actions = [];
     
     switch (order.status) {
@@ -478,73 +687,98 @@ export default function Orders() {
       case OrderStatuses.IN_PRODUCTION.value:
         actions.push({ label: 'Complete Production', action: () => handleCompleteProduction(order), variant: 'default' });
         break;
-      case OrderStatuses.READY_FOR_DELIVERY.value:
+      case OrderStatuses.COMPLETED.value:
         if (order.orderType === 'customer') {
-          actions.push({ label: 'Mark Delivered', action: () => handleReadyForDelivery(order), variant: 'default' });
+          actions.push({ label: 'Ready for Delivery', action: () => handleReadyForDelivery(order), variant: 'default' });
         }
         break;
-      default:
+      case OrderStatuses.READY_FOR_DELIVERY.value:
+        actions.push({ label: 'Mark Delivered', action: () => handleReadyForDelivery(order), variant: 'default' });
         break;
     }
     
     return actions;
   };
 
-  // Stats
-  const stats = {
-    pendingApproval: orders.filter(o => o.status === OrderStatuses.PENDING_APPROVAL.value).length,
-    inProduction: orders.filter(o => o.status === OrderStatuses.IN_PRODUCTION.value).length,
-    readyForDelivery: orders.filter(o => o.status === OrderStatuses.READY_FOR_DELIVERY.value).length,
-    completedThisMonth: orders.filter(o => {
-      const isCompleted = o.status === OrderStatuses.COMPLETED.value || o.status === OrderStatuses.DELIVERED.value;
-      const thisMonth = new Date().getMonth();
-      const orderMonth = new Date(o.updatedAt).getMonth();
-      return isCompleted && thisMonth === orderMonth;
-    }).length
+  // Get status color
+  const getStatusColor = (status) => {
+    const statusObj = OrderStatuses[Object.keys(OrderStatuses).find(k => OrderStatuses[k].value === status)];
+    return statusObj?.color || 'bg-gray-100 text-gray-800';
   };
 
+  // Get status counts
+  const getStatusCounts = () => {
+    const counts = {
+      pendingApproval: 0,
+      inProduction: 0,
+      readyForDelivery: 0,
+      completedThisMonth: 0
+    };
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    orders.forEach(order => {
+      if (order.status === OrderStatuses.PENDING_APPROVAL.value) counts.pendingApproval++;
+      if (order.status === OrderStatuses.IN_PRODUCTION.value) counts.inProduction++;
+      if (order.status === OrderStatuses.READY_FOR_DELIVERY.value) counts.readyForDelivery++;
+      if ((order.status === OrderStatuses.COMPLETED.value || order.status === OrderStatuses.DELIVERED.value) && 
+          new Date(order.updatedAt) >= startOfMonth) {
+        counts.completedThisMonth++;
+      }
+    });
+
+    return counts;
+  };
+
+  const statusCounts = getStatusCounts();
+
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
-        <p className="text-gray-600 mt-1">Manage stock and customer orders with full production workflow</p>
-        <p className="text-sm text-blue-600 mt-1">* Orders flow: Pending Approval → Approved → In Production → Completed/Delivered</p>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Orders</h1>
+          <p className="text-gray-500">Manage stock and customer orders with full production workflow</p>
+          <p className="text-sm text-blue-600 mt-1">
+            * Orders flow: Pending Approval → Approved → In Production → Completed/Delivered
+          </p>
+        </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      {/* Status Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Pending Approval</div>
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendingApproval}</div>
+            <div className="text-sm text-gray-500">Pending Approval</div>
+            <div className="text-2xl font-bold text-yellow-600">{statusCounts.pendingApproval}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">In Production</div>
-            <div className="text-2xl font-bold text-purple-600">{stats.inProduction}</div>
+            <div className="text-sm text-gray-500">In Production</div>
+            <div className="text-2xl font-bold text-purple-600">{statusCounts.inProduction}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Ready for Delivery</div>
-            <div className="text-2xl font-bold text-orange-600">{stats.readyForDelivery}</div>
+            <div className="text-sm text-gray-500">Ready for Delivery</div>
+            <div className="text-2xl font-bold text-orange-600">{statusCounts.readyForDelivery}</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-sm text-gray-600">Completed This Month</div>
-            <div className="text-2xl font-bold text-green-600">{stats.completedThisMonth}</div>
+            <div className="text-sm text-gray-500">Completed This Month</div>
+            <div className="text-2xl font-bold text-green-600">{statusCounts.completedThisMonth}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+      {/* Filters and Search */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <Input
-            type="text"
             placeholder="Search orders..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -552,8 +786,8 @@ export default function Orders() {
           />
         </div>
         <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
-          <SelectTrigger className="w-full sm:w-40">
-            <SelectValue placeholder="Order Type" />
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
@@ -562,118 +796,96 @@ export default function Orders() {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by status" />
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="All Statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Statuses</SelectItem>
             {Object.values(OrderStatuses).map(status => (
-              <SelectItem key={status.value} value={status.value}>
-                {status.label}
-              </SelectItem>
+              <SelectItem key={status.value} value={status.value}>{status.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
-        <Button onClick={handleOpenDialog} className="whitespace-nowrap">
+        <Button onClick={handleOpenDialog}>
           <Plus className="w-4 h-4 mr-2" />
           New Order
         </Button>
       </div>
 
       {/* Orders List */}
-      {filteredOrders.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Package className="w-12 h-12 text-gray-400 mb-4" />
-            <p className="text-gray-500 text-lg">No orders yet</p>
-            <p className="text-gray-400">Create your first order to get started</p>
-            <Button onClick={handleOpenDialog} className="mt-4">
-              <Plus className="w-4 h-4 mr-2" />
-              New Order
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredOrders.map((order) => (
-            <Card key={order.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                    <CardDescription>
-                      {order.orderType === 'stock' ? 'Stock Order' : order.customerName}
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <Badge className={getStatusColor(order.status)}>
-                      {OrderStatuses[Object.keys(OrderStatuses).find(k => OrderStatuses[k].value === order.status)]?.label}
-                    </Badge>
-                    <Badge variant={order.orderType === 'stock' ? 'secondary' : 'outline'}>
-                      {order.orderType === 'stock' ? <Package className="w-3 h-3 mr-1" /> : <Truck className="w-3 h-3 mr-1" />}
-                      {order.orderType === 'stock' ? 'Stock' : 'Customer'}
-                    </Badge>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Product:</span>
-                    <span className="font-medium">{order.productName}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Quantity:</span>
-                    <span className="font-medium">{order.quantity}</span>
-                  </div>
-                  {order.orderType === 'customer' && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Total:</span>
-                      <span className="font-medium">NPR {(order.totalAmount || 0).toLocaleString()}</span>
+      <div className="space-y-4">
+        {filteredOrders.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-gray-500">
+              <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No orders found. Create your first order to get started.</p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredOrders.map(order => (
+            <Card key={order.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-lg">{order.orderNumber}</span>
+                      <Badge className={getStatusColor(order.status)}>
+                        {OrderStatuses[Object.keys(OrderStatuses).find(k => OrderStatuses[k].value === order.status)]?.label}
+                      </Badge>
+                      <Badge variant="outline">
+                        {order.orderType === 'stock' ? '📦 Stock' : '👤 Customer'}
+                      </Badge>
                     </div>
-                  )}
-                  {order.dueDate && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Due Date:</span>
-                      <span className="font-medium">{new Date(order.dueDate).toLocaleDateString()}</span>
+                    <div className="text-sm text-gray-600">
+                      <p><strong>Product:</strong> {order.productName}</p>
+                      <p><strong>Quantity:</strong> {order.quantity}</p>
+                      {order.customerName && <p><strong>Customer:</strong> {order.customerName}</p>}
+                      {order.materialsNeedingPurchase?.length > 0 && (
+                        <p className="text-orange-600 flex items-center gap-1">
+                          <AlertTriangle className="w-4 h-4" />
+                          {order.materialsNeedingPurchase.length} material(s) need to be purchased
+                        </p>
+                      )}
+                      {order.totalProductionCost > 0 && (
+                        <p><strong>Production Cost:</strong> {formatCurrency(order.totalProductionCost)}</p>
+                      )}
                     </div>
-                  )}
-                  {order.bom && order.bom.length > 0 && (
-                    <div className="text-sm text-gray-500">
-                      Materials: {order.bom.length} items
+                    <div className="text-xs text-gray-400">
+                      Materials: {order.bom?.length || 0} items | 
+                      Labour: {order.labourCosts?.length || 0} entries
                     </div>
-                  )}
-                </div>
-                
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setViewingOrder(order)}>
-                    <Eye className="w-4 h-4 mr-1" />
-                    View
-                  </Button>
-                  {getNextActions(order).map((action, idx) => (
-                    <Button 
-                      key={idx} 
-                      size="sm" 
-                      variant={action.variant}
-                      onClick={action.action}
-                    >
-                      {action.label}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setViewingOrder(order)}>
+                      <Eye className="w-4 h-4 mr-1" />
+                      View
                     </Button>
-                  ))}
+                    {getOrderActions(order).map((action, idx) => (
+                      <Button 
+                        key={idx} 
+                        size="sm" 
+                        variant={action.variant}
+                        onClick={action.action}
+                      >
+                        {action.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
       {/* New Order Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Order</DialogTitle>
-            <DialogDescription>Create a new stock or customer order with Bill of Materials</DialogDescription>
+            <DialogTitle>Create New Order</DialogTitle>
+            <DialogDescription>
+              Create a stock order (for inventory) or customer order (for delivery)
+            </DialogDescription>
           </DialogHeader>
           
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -689,14 +901,14 @@ export default function Orders() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="stock">
-                    <div className="flex items-center">
-                      <Package className="w-4 h-4 mr-2" />
+                    <div className="flex items-center gap-2">
+                      <Package className="w-4 h-4" />
                       Stock Order (Build for Inventory)
                     </div>
                   </SelectItem>
                   <SelectItem value="customer">
-                    <div className="flex items-center">
-                      <Truck className="w-4 h-4 mr-2" />
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4" />
                       Customer Order (For Delivery)
                     </div>
                   </SelectItem>
@@ -774,72 +986,289 @@ export default function Orders() {
             {/* Bill of Materials */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <Label>Bill of Materials (BOM) *</Label>
-                <Button type="button" size="sm" variant="outline" onClick={handleAddBomItem}>
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add Material
-                </Button>
+                <Label className="flex items-center gap-2">
+                  <Package className="w-4 h-4" />
+                  Bill of Materials (BOM) *
+                </Label>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={handleAddBomItem}>
+                    <Plus className="w-4 h-4 mr-1" />
+                    From Inventory
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={handleAddCustomMaterial}>
+                    <ShoppingCart className="w-4 h-4 mr-1" />
+                    Custom (To Purchase)
+                  </Button>
+                </div>
               </div>
               
               {formData.bom.length === 0 ? (
                 <div className="border-2 border-dashed rounded-lg p-4 text-center text-gray-500">
-                  No materials added. Click "Add Material" to define required materials.
+                  No materials added. Add materials from inventory or custom materials to purchase.
                 </div>
               ) : (
                 <div className="space-y-3 border rounded-lg p-3">
                   {formData.bom.map((item, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-4">
-                        <Label className="text-xs">Material Name</Label>
-                        <Input
-                          value={item.materialName}
-                          onChange={(e) => handleBomItemChange(index, 'materialName', e.target.value)}
-                          placeholder="e.g., Wood, Fabric"
-                          className="h-9"
-                        />
+                    <div key={index} className={`p-3 rounded-lg ${item.isOutOfStock ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
+                      <div className="grid grid-cols-12 gap-2 items-end">
+                        {item.materialId === 'custom' ? (
+                          // Custom material input
+                          <>
+                            <div className="col-span-4">
+                              <Label className="text-xs">Material Name (Custom)</Label>
+                              <Input
+                                value={item.materialName}
+                                onChange={(e) => handleBomItemChange(index, 'materialName', e.target.value)}
+                                placeholder="Enter material name"
+                                className="h-9"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Quantity</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.quantity}
+                                onChange={(e) => handleBomItemChange(index, 'quantity', e.target.value)}
+                                className="h-9"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Unit</Label>
+                              <Select 
+                                value={item.unit} 
+                                onValueChange={(value) => handleBomItemChange(index, 'unit', value)}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {materialUnits.map(unit => (
+                                    <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Est. Cost</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={item.estimatedCost}
+                                onChange={(e) => handleBomItemChange(index, 'estimatedCost', e.target.value)}
+                                placeholder="NPR"
+                                className="h-9"
+                              />
+                            </div>
+                            <div className="col-span-1">
+                              <Button 
+                                type="button" 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-9 w-9 p-0 text-red-500"
+                                onClick={() => handleRemoveBomItem(index)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          // Inventory material selection
+                          <>
+                            <div className="col-span-4">
+                              <Label className="text-xs">Select Material</Label>
+                              <Select 
+                                value={item.materialId?.toString()} 
+                                onValueChange={(value) => handleBomItemChange(index, 'materialId', value)}
+                              >
+                                <SelectTrigger className="h-9">
+                                  <SelectValue placeholder="Select from inventory" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(rawMaterials || []).map(material => {
+                                    const qty = parseFloat(material.quantity) || 0;
+                                    const isOutOfStock = qty === 0;
+                                    const isLowStock = qty > 0 && qty <= (parseFloat(material.minStock) || 0);
+                                    return (
+                                      <SelectItem key={material.id} value={material.id.toString()}>
+                                        <div className="flex items-center gap-2">
+                                          {isOutOfStock ? (
+                                            <AlertTriangle className="w-3 h-3 text-red-500" />
+                                          ) : isLowStock ? (
+                                            <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                                          ) : (
+                                            <CheckCircle className="w-3 h-3 text-green-500" />
+                                          )}
+                                          <span>{material.name}</span>
+                                          <span className="text-xs text-gray-400">
+                                            ({qty} {material.unit})
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Qty Needed</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.quantity}
+                                onChange={(e) => handleBomItemChange(index, 'quantity', e.target.value)}
+                                className="h-9"
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Available</Label>
+                              <div className={`h-9 flex items-center px-2 rounded text-sm ${
+                                item.availableStock >= (parseFloat(item.quantity) || 0) 
+                                  ? 'bg-green-100 text-green-700' 
+                                  : 'bg-red-100 text-red-700'
+                              }`}>
+                                {item.availableStock} {item.unit}
+                              </div>
+                            </div>
+                            <div className="col-span-2">
+                              <Label className="text-xs">Unit Cost</Label>
+                              <div className="h-9 flex items-center px-2 bg-gray-100 rounded text-sm">
+                                {formatCurrency(item.pricePerUnit)}
+                              </div>
+                            </div>
+                            <div className="col-span-1">
+                              <Button 
+                                type="button" 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-9 w-9 p-0 text-red-500"
+                                onClick={() => handleRemoveBomItem(index)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
-                      <div className="col-span-2">
-                        <Label className="text-xs">Category</Label>
+                      
+                      {/* Stock warning */}
+                      {item.isOutOfStock && item.materialId !== 'custom' && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-500" />
+                          <span className="text-sm text-red-600">
+                            Insufficient stock! Shortage: {item.shortage || item.quantity} {item.unit}
+                          </span>
+                          <label className="flex items-center gap-1 ml-4">
+                            <input
+                              type="checkbox"
+                              checked={item.needToPurchase}
+                              onChange={(e) => handleBomItemChange(index, 'needToPurchase', e.target.checked)}
+                              className="rounded"
+                            />
+                            <span className="text-sm">Mark for purchase</span>
+                          </label>
+                        </div>
+                      )}
+                      
+                      {/* Purchase note for out of stock items */}
+                      {(item.needToPurchase || item.materialId === 'custom') && (
+                        <div className="mt-2">
+                          <Input
+                            value={item.purchaseNote}
+                            onChange={(e) => handleBomItemChange(index, 'purchaseNote', e.target.value)}
+                            placeholder="Purchase note (e.g., supplier, urgency)"
+                            className="h-8 text-sm"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  {/* BOM Cost Summary */}
+                  <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Estimated Material Cost (per unit):</span>
+                    <span className="font-bold">{formatCurrency(calculateBomCost())}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Labour Costs */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Labour Costs
+                </Label>
+                <Button type="button" size="sm" variant="outline" onClick={handleAddLabourCost}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Labour
+                </Button>
+              </div>
+              
+              {formData.labourCosts.length === 0 ? (
+                <div className="border-2 border-dashed rounded-lg p-4 text-center text-gray-500">
+                  No labour costs added. Click "Add Labour" to assign workers.
+                </div>
+              ) : (
+                <div className="space-y-3 border rounded-lg p-3">
+                  {formData.labourCosts.map((item, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-end bg-gray-50 p-3 rounded-lg">
+                      <div className="col-span-3">
+                        <Label className="text-xs">Select Worker</Label>
                         <Select 
-                          value={item.category} 
-                          onValueChange={(value) => handleBomItemChange(index, 'category', value)}
+                          value={item.labourerId?.toString()} 
+                          onValueChange={(value) => handleLabourCostChange(index, 'labourerId', value)}
                         >
                           <SelectTrigger className="h-9">
-                            <SelectValue />
+                            <SelectValue placeholder="Select worker" />
                           </SelectTrigger>
                           <SelectContent>
-                            {materialCategories.map(cat => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            {labourers.map(labourer => (
+                              <SelectItem key={labourer.id} value={labourer.id.toString()}>
+                                {labourer.name} ({labourer.specialization})
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
                       <div className="col-span-2">
-                        <Label className="text-xs">Quantity</Label>
+                        <Label className="text-xs">Work Type</Label>
+                        <Input
+                          value={item.workType}
+                          onChange={(e) => handleLabourCostChange(index, 'workType', e.target.value)}
+                          placeholder="e.g., Assembly"
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-xs">Hours Est.</Label>
                         <Input
                           type="number"
                           min="0"
-                          step="0.01"
-                          value={item.quantity}
-                          onChange={(e) => handleBomItemChange(index, 'quantity', e.target.value)}
+                          step="0.5"
+                          value={item.hoursEstimated}
+                          onChange={(e) => handleLabourCostChange(index, 'hoursEstimated', e.target.value)}
                           className="h-9"
                         />
                       </div>
-                      <div className="col-span-3">
-                        <Label className="text-xs">Unit</Label>
-                        <Select 
-                          value={item.unit} 
-                          onValueChange={(value) => handleBomItemChange(index, 'unit', value)}
-                        >
-                          <SelectTrigger className="h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {materialUnits.map(unit => (
-                              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <div className="col-span-2">
+                        <Label className="text-xs">Rate/Hour</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.ratePerHour}
+                          onChange={(e) => handleLabourCostChange(index, 'ratePerHour', e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Label className="text-xs">Total Cost</Label>
+                        <div className="h-9 flex items-center px-2 bg-blue-100 rounded text-sm font-medium">
+                          {formatCurrency(parseFloat(item.cost) || 0)}
+                        </div>
                       </div>
                       <div className="col-span-1">
                         <Button 
@@ -847,16 +1276,46 @@ export default function Orders() {
                           size="sm" 
                           variant="ghost" 
                           className="h-9 w-9 p-0 text-red-500"
-                          onClick={() => handleRemoveBomItem(index)}
+                          onClick={() => handleRemoveLabourCost(index)}
                         >
                           <X className="w-4 h-4" />
                         </Button>
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Labour Cost Summary */}
+                  <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Labour Cost (per unit):</span>
+                    <span className="font-bold">{formatCurrency(calculateLabourCost())}</span>
+                  </div>
                 </div>
               )}
             </div>
+
+            {/* Total Cost Summary */}
+            <Card className="bg-blue-50">
+              <CardContent className="p-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Material Cost (per unit):</span>
+                    <span>{formatCurrency(calculateBomCost())}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Labour Cost (per unit):</span>
+                    <span>{formatCurrency(calculateLabourCost())}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Quantity:</span>
+                    <span>× {formData.quantity || 1}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg border-t pt-2">
+                    <span>Total Production Cost:</span>
+                    <span>{formatCurrency(calculateTotalCost())}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Notes */}
             <div className="space-y-2">
@@ -899,7 +1358,15 @@ export default function Orders() {
                     {OrderStatuses[Object.keys(OrderStatuses).find(k => OrderStatuses[k].value === viewingOrder.status)]?.label}
                   </Badge>
                 </div>
-                {viewingOrder.orderType === 'customer' && (
+                <div>
+                  <Label className="text-gray-500">Product</Label>
+                  <p className="font-medium">{viewingOrder.productName}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Quantity</Label>
+                  <p className="font-medium">{viewingOrder.quantity}</p>
+                </div>
+                {viewingOrder.customerName && (
                   <>
                     <div>
                       <Label className="text-gray-500">Customer</Label>
@@ -911,29 +1378,25 @@ export default function Orders() {
                     </div>
                   </>
                 )}
-                <div>
-                  <Label className="text-gray-500">Product</Label>
-                  <p className="font-medium">{viewingOrder.productName}</p>
-                </div>
-                <div>
-                  <Label className="text-gray-500">Quantity</Label>
-                  <p className="font-medium">{viewingOrder.quantity}</p>
-                </div>
-                {viewingOrder.orderType === 'customer' && (
-                  <div>
-                    <Label className="text-gray-500">Total Amount</Label>
-                    <p className="font-medium">NPR {(viewingOrder.totalAmount || 0).toLocaleString()}</p>
-                  </div>
-                )}
-                {viewingOrder.dueDate && (
-                  <div>
-                    <Label className="text-gray-500">Due Date</Label>
-                    <p className="font-medium">{new Date(viewingOrder.dueDate).toLocaleDateString()}</p>
-                  </div>
+                {viewingOrder.totalProductionCost > 0 && (
+                  <>
+                    <div>
+                      <Label className="text-gray-500">Material Cost</Label>
+                      <p className="font-medium">{formatCurrency(viewingOrder.materialCost || 0)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-500">Labour Cost</Label>
+                      <p className="font-medium">{formatCurrency(viewingOrder.labourCost || 0)}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-gray-500">Total Production Cost</Label>
+                      <p className="font-bold text-lg">{formatCurrency(viewingOrder.totalProductionCost)}</p>
+                    </div>
+                  </>
                 )}
               </div>
 
-              {/* BOM Section */}
+              {/* BOM Details */}
               {viewingOrder.bom && viewingOrder.bom.length > 0 && (
                 <div>
                   <Label className="text-gray-500">Bill of Materials</Label>
@@ -942,23 +1405,76 @@ export default function Orders() {
                       <thead className="bg-gray-50">
                         <tr>
                           <th className="px-3 py-2 text-left">Material</th>
-                          <th className="px-3 py-2 text-left">Category</th>
                           <th className="px-3 py-2 text-right">Qty/Unit</th>
                           <th className="px-3 py-2 text-right">Total Needed</th>
+                          <th className="px-3 py-2 text-center">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {viewingOrder.bom.map((item, idx) => (
                           <tr key={idx} className="border-t">
                             <td className="px-3 py-2">{item.materialName}</td>
-                            <td className="px-3 py-2">{item.category}</td>
                             <td className="px-3 py-2 text-right">{item.quantity} {item.unit}</td>
-                            <td className="px-3 py-2 text-right">{item.totalNeeded || (item.quantity * viewingOrder.quantity)} {item.unit}</td>
+                            <td className="px-3 py-2 text-right">{item.totalNeeded} {item.unit}</td>
+                            <td className="px-3 py-2 text-center">
+                              {item.needToPurchase || item.materialId === 'custom' ? (
+                                <Badge variant="outline" className="bg-orange-50 text-orange-700">To Purchase</Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-green-50 text-green-700">In Stock</Badge>
+                              )}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                </div>
+              )}
+
+              {/* Labour Details */}
+              {viewingOrder.labourCosts && viewingOrder.labourCosts.length > 0 && (
+                <div>
+                  <Label className="text-gray-500">Labour Costs</Label>
+                  <div className="mt-2 border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Worker</th>
+                          <th className="px-3 py-2 text-left">Work Type</th>
+                          <th className="px-3 py-2 text-right">Hours</th>
+                          <th className="px-3 py-2 text-right">Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewingOrder.labourCosts.map((item, idx) => (
+                          <tr key={idx} className="border-t">
+                            <td className="px-3 py-2">{item.labourerName}</td>
+                            <td className="px-3 py-2">{item.workType}</td>
+                            <td className="px-3 py-2 text-right">{item.hoursEstimated}</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(item.totalCost || item.cost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Materials Needing Purchase */}
+              {viewingOrder.materialsNeedingPurchase && viewingOrder.materialsNeedingPurchase.length > 0 && (
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <Label className="text-orange-700 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Materials Needing Purchase
+                  </Label>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {viewingOrder.materialsNeedingPurchase.map((item, idx) => (
+                      <li key={idx} className="flex justify-between">
+                        <span>{item.materialName}</span>
+                        <span>{item.shortage} {item.unit}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
@@ -968,11 +1484,12 @@ export default function Orders() {
                   <Label className="text-gray-500">Status History</Label>
                   <div className="mt-2 space-y-2">
                     {viewingOrder.statusHistory.map((history, idx) => (
-                      <div key={idx} className="flex items-center text-sm">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 mr-2"></div>
-                        <span className="text-gray-600">{new Date(history.timestamp).toLocaleString()}</span>
-                        <ChevronRight className="w-4 h-4 mx-2 text-gray-400" />
-                        <span className="font-medium">{history.note}</span>
+                      <div key={idx} className="flex items-center gap-2 text-sm">
+                        <Badge className={getStatusColor(history.status)} variant="outline">
+                          {OrderStatuses[Object.keys(OrderStatuses).find(k => OrderStatuses[k].value === history.status)]?.label}
+                        </Badge>
+                        <span className="text-gray-500">{formatDate(history.timestamp)}</span>
+                        {history.note && <span className="text-gray-400">- {history.note}</span>}
                       </div>
                     ))}
                   </div>
@@ -982,7 +1499,7 @@ export default function Orders() {
               {viewingOrder.notes && (
                 <div>
                   <Label className="text-gray-500">Notes</Label>
-                  <p className="mt-1">{viewingOrder.notes}</p>
+                  <p className="text-sm">{viewingOrder.notes}</p>
                 </div>
               )}
             </div>
@@ -990,68 +1507,62 @@ export default function Orders() {
         </DialogContent>
       </Dialog>
 
-      {/* Completion Dialog (for finishing production) */}
+      {/* Complete Production Dialog */}
       <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Complete Production</DialogTitle>
             <DialogDescription>
-              {completingOrder?.orderType === 'stock' 
-                ? 'Add product photo and set selling price for inventory'
-                : 'Mark production as complete'}
+              Add product photo and set selling price for inventory
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            {completingOrder?.orderType === 'stock' && (
-              <>
-                <div className="space-y-2">
-                  <Label>Selling Price (NPR) *</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={completionData.sellingPrice}
-                    onChange={(e) => setCompletionData({ ...completionData, sellingPrice: e.target.value })}
-                    placeholder="Enter selling price"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Product Photo</Label>
-                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                    {completionData.productPhotoPreview ? (
-                      <div className="relative">
-                        <img 
-                          src={completionData.productPhotoPreview} 
-                          alt="Product" 
-                          className="max-h-40 mx-auto rounded"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="destructive"
-                          className="absolute top-0 right-0"
-                          onClick={() => setCompletionData({ ...completionData, productPhoto: null, productPhotoPreview: '' })}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <label className="cursor-pointer">
-                        <Camera className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-500">Click to upload photo</p>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => handlePhotoUpload(e, 'completion')}
-                        />
-                      </label>
-                    )}
+            <div className="space-y-2">
+              <Label>Selling Price (NPR) *</Label>
+              <Input
+                type="number"
+                min="0"
+                value={completionData.sellingPrice}
+                onChange={(e) => setCompletionData({ ...completionData, sellingPrice: e.target.value })}
+                placeholder="Enter selling price"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Product Photo</Label>
+              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                {completionData.productPhotoPreview ? (
+                  <div className="relative">
+                    <img 
+                      src={completionData.productPhotoPreview} 
+                      alt="Product" 
+                      className="max-h-40 mx-auto rounded"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      className="absolute top-0 right-0"
+                      onClick={() => setCompletionData({ ...completionData, productPhoto: null, productPhotoPreview: '' })}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
                   </div>
-                </div>
-              </>
-            )}
+                ) : (
+                  <label className="cursor-pointer">
+                    <Camera className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                    <p className="text-sm text-gray-500">Click to upload photo</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handlePhotoUpload(e, 'completion')}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
           </div>
 
           <DialogFooter>
@@ -1059,32 +1570,33 @@ export default function Orders() {
               Cancel
             </Button>
             <Button onClick={handleCompletionSubmit}>
+              <CheckCircle className="w-4 h-4 mr-2" />
               Complete Production
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delivery Dialog (for customer orders) */}
+      {/* Delivery Dialog */}
       <Dialog open={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Mark as Delivered</DialogTitle>
+            <DialogTitle>Confirm Delivery</DialogTitle>
             <DialogDescription>
-              Confirm delivery details. A sale record will be created automatically.
+              Record delivery details for this order
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Delivery Date</Label>
+              <Label>Delivery Date *</Label>
               <Input
                 type="date"
                 value={deliveryData.deliveryDate}
                 onChange={(e) => setDeliveryData({ ...deliveryData, deliveryDate: e.target.value })}
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label>Delivery Notes</Label>
               <Textarea
@@ -1094,9 +1606,9 @@ export default function Orders() {
                 rows={2}
               />
             </div>
-            
+
             <div className="space-y-2">
-              <Label>Delivery Photo (Proof)</Label>
+              <Label>Delivery Photo</Label>
               <div className="border-2 border-dashed rounded-lg p-4 text-center">
                 {deliveryData.deliveryPhotoPreview ? (
                   <div className="relative">

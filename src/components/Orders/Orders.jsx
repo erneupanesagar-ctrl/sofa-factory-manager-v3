@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../contexts/AppContext';
-import { Plus, Search, Eye, MessageCircle, ChevronRight, Package, Truck, Camera, Trash2, X, AlertTriangle, CheckCircle, ShoppingCart, Users } from 'lucide-react';
+import { Plus, Search, Eye, MessageCircle, ChevronRight, Package, Truck, Camera, Trash2, X, AlertTriangle, CheckCircle, ShoppingCart, Users, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -52,8 +52,9 @@ export default function Orders() {
     unitPrice: '',
     notes: '',
     dueDate: '',
-    bom: [], // Bill of Materials
-    labourCosts: [] // Labour costs
+    bom: [], // Bill of Materials - multiple items
+    labourCosts: [], // Labour costs - per piece
+    otherCosts: [] // Miscellaneous/Other costs
   });
 
   // Completion form state (for stock orders)
@@ -117,9 +118,13 @@ export default function Orders() {
     }
   };
 
-  // Calculate total BOM cost
+  // Calculate total BOM cost (per unit)
   const calculateBomCost = () => {
     return formData.bom.reduce((total, item) => {
+      if (item.materialId === 'custom') {
+        // Custom material - use estimated cost
+        return total + (parseFloat(item.estimatedCost) || 0);
+      }
       const material = (rawMaterials || []).find(m => m.id === parseInt(item.materialId));
       if (material) {
         const qty = parseFloat(item.quantity) || 0;
@@ -130,10 +135,17 @@ export default function Orders() {
     }, 0);
   };
 
-  // Calculate total labour cost
+  // Calculate total labour cost (per unit) - now per piece
   const calculateLabourCost = () => {
     return formData.labourCosts.reduce((total, item) => {
-      return total + (parseFloat(item.cost) || 0);
+      return total + (parseFloat(item.costPerPiece) || 0);
+    }, 0);
+  };
+
+  // Calculate total other/miscellaneous costs (per unit)
+  const calculateOtherCosts = () => {
+    return formData.otherCosts.reduce((total, item) => {
+      return total + (parseFloat(item.amount) || 0);
     }, 0);
   };
 
@@ -141,8 +153,9 @@ export default function Orders() {
   const calculateTotalCost = () => {
     const bomCost = calculateBomCost();
     const labourCost = calculateLabourCost();
+    const otherCost = calculateOtherCosts();
     const quantity = parseInt(formData.quantity) || 1;
-    return (bomCost + labourCost) * quantity;
+    return (bomCost + labourCost + otherCost) * quantity;
   };
 
   const handleOpenDialog = () => {
@@ -155,7 +168,8 @@ export default function Orders() {
       notes: '',
       dueDate: '',
       bom: [],
-      labourCosts: []
+      labourCosts: [],
+      otherCosts: []
     });
     setIsDialogOpen(true);
   };
@@ -243,7 +257,7 @@ export default function Orders() {
     setFormData({ ...formData, bom: newBom });
   };
 
-  // Labour Cost Management
+  // Labour Cost Management - Per Piece
   const handleAddLabourCost = () => {
     setFormData({
       ...formData,
@@ -251,9 +265,7 @@ export default function Orders() {
         labourerId: '',
         labourerName: '',
         workType: '',
-        hoursEstimated: '',
-        ratePerHour: '',
-        cost: ''
+        costPerPiece: '' // Manual entry for cost per piece
       }]
     });
   };
@@ -267,33 +279,41 @@ export default function Orders() {
     const newLabourCosts = [...formData.labourCosts];
     newLabourCosts[index] = { ...newLabourCosts[index], [field]: value };
     
-    // If labourer is selected, update related fields
+    // If labourer is selected, update name
     if (field === 'labourerId') {
       const labourer = labourers.find(l => l.id === parseInt(value));
       if (labourer) {
         newLabourCosts[index] = {
           ...newLabourCosts[index],
           labourerName: labourer.name,
-          ratePerHour: (parseFloat(labourer.dailyWage) / 8).toFixed(2), // Assuming 8-hour workday
           specialization: labourer.specialization
         };
-        // Recalculate cost if hours are set
-        if (newLabourCosts[index].hoursEstimated) {
-          const hours = parseFloat(newLabourCosts[index].hoursEstimated) || 0;
-          const rate = parseFloat(newLabourCosts[index].ratePerHour) || 0;
-          newLabourCosts[index].cost = (hours * rate).toFixed(2);
-        }
       }
     }
     
-    // Recalculate cost when hours or rate changes
-    if (field === 'hoursEstimated' || field === 'ratePerHour') {
-      const hours = parseFloat(field === 'hoursEstimated' ? value : newLabourCosts[index].hoursEstimated) || 0;
-      const rate = parseFloat(field === 'ratePerHour' ? value : newLabourCosts[index].ratePerHour) || 0;
-      newLabourCosts[index].cost = (hours * rate).toFixed(2);
-    }
-    
     setFormData({ ...formData, labourCosts: newLabourCosts });
+  };
+
+  // Other/Miscellaneous Cost Management
+  const handleAddOtherCost = () => {
+    setFormData({
+      ...formData,
+      otherCosts: [...formData.otherCosts, {
+        description: '',
+        amount: ''
+      }]
+    });
+  };
+
+  const handleRemoveOtherCost = (index) => {
+    const newOtherCosts = formData.otherCosts.filter((_, i) => i !== index);
+    setFormData({ ...formData, otherCosts: newOtherCosts });
+  };
+
+  const handleOtherCostChange = (index, field, value) => {
+    const newOtherCosts = [...formData.otherCosts];
+    newOtherCosts[index] = { ...newOtherCosts[index], [field]: value };
+    setFormData({ ...formData, otherCosts: newOtherCosts });
   };
 
   const handleSubmit = async (e) => {
@@ -340,7 +360,8 @@ export default function Orders() {
       // Calculate costs
       const materialCost = calculateBomCost();
       const labourCost = calculateLabourCost();
-      const totalProductionCost = (materialCost + labourCost) * quantity;
+      const otherCost = calculateOtherCosts();
+      const totalProductionCost = (materialCost + labourCost + otherCost) * quantity;
 
       const orderData = {
         orderNumber,
@@ -352,6 +373,7 @@ export default function Orders() {
         totalAmount: unitPrice * quantity,
         materialCost: materialCost * quantity,
         labourCost: labourCost * quantity,
+        otherCost: otherCost * quantity,
         totalProductionCost,
         bom: formData.bom.map(item => ({
           ...item,
@@ -360,7 +382,13 @@ export default function Orders() {
         })),
         labourCosts: formData.labourCosts.map(item => ({
           ...item,
-          totalCost: (parseFloat(item.cost) || 0) * quantity
+          costPerPiece: parseFloat(item.costPerPiece) || 0,
+          totalCost: (parseFloat(item.costPerPiece) || 0) * quantity
+        })),
+        otherCosts: formData.otherCosts.map(item => ({
+          ...item,
+          amount: parseFloat(item.amount) || 0,
+          totalAmount: (parseFloat(item.amount) || 0) * quantity
         })),
         materialsNeedingPurchase: materialsNeedingPurchase.map(item => ({
           materialName: item.materialName,
@@ -451,203 +479,73 @@ export default function Orders() {
       // Skip custom materials (not in inventory)
       if (bomItem.materialId === 'custom') continue;
       
-      // Find matching raw material by ID
       const material = (rawMaterials || []).find(m => m.id === parseInt(bomItem.materialId));
-      
       if (material) {
-        const toDeduct = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
-        const newQuantity = Math.max(0, (parseFloat(material.quantity) || 0) - toDeduct);
+        const totalNeeded = bomItem.totalNeeded || (parseFloat(bomItem.quantity) * order.quantity);
+        const newQuantity = Math.max(0, (parseFloat(material.quantity) || 0) - totalNeeded);
         
-        const updatedMaterial = {
+        await actions.updateItem('rawMaterials', {
           ...material,
-          quantity: newQuantity
-        };
-        await actions.updateItem('rawMaterials', updatedMaterial);
+          quantity: newQuantity,
+          updatedAt: new Date().toISOString()
+        });
       }
     }
+    
+    // Refresh raw materials
+    await actions.loadRawMaterials();
   };
 
   const addToFinishedProducts = async (order, completionData) => {
-    const productData = {
-      name: order.productName,
-      category: 'Finished Product',
-      stock: order.quantity,
-      sellingPrice: parseFloat(completionData.sellingPrice) || 0,
-      productionCost: order.totalProductionCost || 0,
-      photo: completionData.productPhotoPreview || null,
-      orderNumber: order.orderNumber,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const finishedProduct = {
+        name: order.productName,
+        description: `Produced from order ${order.orderNumber}`,
+        quantity: order.quantity,
+        sellingPrice: parseFloat(completionData.sellingPrice) || 0,
+        productionCost: order.totalProductionCost / order.quantity,
+        totalValue: (parseFloat(completionData.sellingPrice) || 0) * order.quantity,
+        photo: completionData.productPhotoPreview || null,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-    await actions.addItem('finishedProducts', productData);
+      await actions.addItem('finishedProducts', finishedProduct);
+    } catch (error) {
+      console.error('Error adding to finished products:', error);
+    }
   };
 
   const createSaleRecord = async (order, deliveryData) => {
-    const saleData = {
-      date: deliveryData.deliveryDate || new Date().toISOString().split('T')[0],
-      customerId: order.customerId,
-      customerName: order.customerName,
-      productName: order.productName,
-      quantity: order.quantity,
-      unitPrice: order.unitPrice,
-      totalAmount: order.totalAmount,
-      productionCost: order.totalProductionCost || 0,
-      profit: (order.totalAmount || 0) - (order.totalProductionCost || 0),
-      orderNumber: order.orderNumber,
-      deliveryNotes: deliveryData.deliveryNotes,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      const saleRecord = {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        customerId: order.customerId,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        productName: order.productName,
+        quantity: order.quantity,
+        unitPrice: order.unitPrice,
+        totalAmount: order.totalAmount,
+        productionCost: order.totalProductionCost,
+        profit: order.totalAmount - order.totalProductionCost,
+        deliveryDate: deliveryData.deliveryDate,
+        deliveryNotes: deliveryData.deliveryNotes,
+        deliveryPhoto: deliveryData.deliveryPhotoPreview || null,
+        status: 'completed',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-    await actions.addItem('sales', saleData);
-  };
-
-  // Approval handler
-  const handleApprove = async (order) => {
-    // Check if all materials are available
-    const unavailableMaterials = [];
-    for (const bomItem of (order.bom || [])) {
-      if (bomItem.materialId === 'custom') continue;
-      
-      const material = (rawMaterials || []).find(m => m.id === parseInt(bomItem.materialId));
-      if (!material) {
-        unavailableMaterials.push(`${bomItem.materialName} (not found)`);
-      } else {
-        const available = parseFloat(material.quantity) || 0;
-        const needed = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
-        if (available < needed) {
-          unavailableMaterials.push(`${bomItem.materialName}: Need ${needed}, Have ${available}`);
-        }
-      }
-    }
-
-    let confirmMessage = 'Approve this order and move to production queue?';
-    if (unavailableMaterials.length > 0) {
-      confirmMessage = `Warning: Some materials are insufficient:\n${unavailableMaterials.join('\n')}\n\nDo you still want to approve this order?`;
-    }
-
-    if (window.confirm(confirmMessage)) {
-      await handleStatusUpdate(order, OrderStatuses.APPROVED.value);
-      alert('Order approved!');
+      await actions.addItem('sales', saleRecord);
+    } catch (error) {
+      console.error('Error creating sale record:', error);
     }
   };
 
-  // Cancel handler
-  const handleCancelOrder = async (order) => {
-    if (window.confirm('Are you sure you want to cancel this order?')) {
-      await handleStatusUpdate(order, OrderStatuses.CANCELLED.value);
-      alert('Order cancelled.');
-    }
-  };
-
-  // Start production handler
-  const handleStartProduction = async (order) => {
-    // Validate materials availability
-    let canStart = true;
-    let missingMaterials = [];
-
-    for (const bomItem of (order.bom || [])) {
-      if (bomItem.materialId === 'custom') {
-        if (bomItem.needToPurchase) {
-          canStart = false;
-          missingMaterials.push(`${bomItem.materialName}: Custom material - needs to be purchased`);
-        }
-        continue;
-      }
-      
-      const totalNeeded = bomItem.totalNeeded || (bomItem.quantity * order.quantity);
-      const material = (rawMaterials || []).find(m => m.id === parseInt(bomItem.materialId));
-      
-      if (!material) {
-        canStart = false;
-        missingMaterials.push(`${bomItem.materialName}: Not found in inventory`);
-      } else {
-        const available = parseFloat(material.quantity) || 0;
-        if (available < totalNeeded) {
-          canStart = false;
-          missingMaterials.push(`${bomItem.materialName}: Need ${totalNeeded}, Have ${available}`);
-        }
-      }
-    }
-
-    if (!canStart) {
-      alert(`Cannot start production. Insufficient materials:\n${missingMaterials.join('\n')}`);
-      return;
-    }
-
-    if (window.confirm('Start production? Materials will be deducted from inventory.')) {
-      const success = await handleStatusUpdate(order, OrderStatuses.IN_PRODUCTION.value);
-      if (success) {
-        alert('Production started! Materials have been deducted.');
-      }
-    }
-  };
-
-  // Complete production handler
-  const handleCompleteProduction = (order) => {
-    setCompletingOrder(order);
-    setCompletionData({
-      productPhoto: null,
-      productPhotoPreview: '',
-      sellingPrice: order.unitPrice?.toString() || ''
-    });
-    setIsCompletionDialogOpen(true);
-  };
-
-  const handleCompletionSubmit = async () => {
-    if (!completingOrder) return;
-
-    if (completingOrder.orderType === 'stock' && !completionData.sellingPrice) {
-      alert('Please enter selling price for stock item');
-      return;
-    }
-
-    const newStatus = completingOrder.orderType === 'stock' 
-      ? OrderStatuses.COMPLETED.value 
-      : OrderStatuses.COMPLETED.value;
-
-    const success = await handleStatusUpdate(completingOrder, newStatus, completionData);
-    
-    if (success) {
-      if (completingOrder.orderType === 'stock') {
-        alert('Production completed! Product added to Finished Products inventory.');
-      } else {
-        alert('Production completed! Order is ready for delivery.');
-        // Move customer order to Ready for Delivery
-        await handleStatusUpdate(
-          { ...completingOrder, status: newStatus },
-          OrderStatuses.READY_FOR_DELIVERY.value
-        );
-      }
-      setIsCompletionDialogOpen(false);
-      setCompletingOrder(null);
-    }
-  };
-
-  // Delivery handler for customer orders
-  const handleReadyForDelivery = (order) => {
-    setDeliveringOrder(order);
-    setDeliveryData({
-      deliveryDate: new Date().toISOString().split('T')[0],
-      deliveryNotes: '',
-      deliveryPhoto: null,
-      deliveryPhotoPreview: ''
-    });
-    setIsDeliveryDialogOpen(true);
-  };
-
-  const handleDeliverySubmit = async () => {
-    if (!deliveringOrder) return;
-
-    const success = await handleStatusUpdate(deliveringOrder, OrderStatuses.DELIVERED.value, deliveryData);
-    
-    if (success) {
-      alert('Order delivered! Sale record has been created.');
-      setIsDeliveryDialogOpen(false);
-      setDeliveringOrder(null);
-    }
-  };
-
-  // Photo upload handler
   const handlePhotoUpload = (e, type) => {
     const file = e.target.files[0];
     if (file) {
@@ -671,29 +569,157 @@ export default function Orders() {
     }
   };
 
-  // Get order actions based on status
+  const handleCompletionSubmit = async () => {
+    if (!completionData.sellingPrice) {
+      alert('Please enter selling price');
+      return;
+    }
+
+    const success = await handleStatusUpdate(
+      completingOrder,
+      OrderStatuses.COMPLETED.value,
+      {
+        sellingPrice: parseFloat(completionData.sellingPrice),
+        productPhoto: completionData.productPhotoPreview
+      }
+    );
+
+    if (success) {
+      setIsCompletionDialogOpen(false);
+      setCompletingOrder(null);
+      setCompletionData({ productPhoto: null, productPhotoPreview: '', sellingPrice: '' });
+      alert('Production completed! Product added to finished inventory.');
+    }
+  };
+
+  const handleDeliverySubmit = async () => {
+    const success = await handleStatusUpdate(
+      deliveringOrder,
+      OrderStatuses.DELIVERED.value,
+      {
+        deliveryDate: deliveryData.deliveryDate,
+        deliveryNotes: deliveryData.deliveryNotes,
+        deliveryPhoto: deliveryData.deliveryPhotoPreview
+      }
+    );
+
+    if (success) {
+      setIsDeliveryDialogOpen(false);
+      setDeliveringOrder(null);
+      setDeliveryData({
+        deliveryDate: new Date().toISOString().split('T')[0],
+        deliveryNotes: '',
+        deliveryPhoto: null,
+        deliveryPhotoPreview: ''
+      });
+      alert('Delivery confirmed! Sale record created.');
+    }
+  };
+
+  // Get available actions for an order based on its status
   const getOrderActions = (order) => {
     const actions = [];
     
     switch (order.status) {
       case OrderStatuses.PENDING_APPROVAL.value:
-        actions.push({ label: 'Approve', action: () => handleApprove(order), variant: 'default' });
-        actions.push({ label: 'Cancel', action: () => handleCancelOrder(order), variant: 'destructive' });
+        actions.push({
+          label: 'Approve',
+          variant: 'default',
+          action: () => {
+            if (confirm('Approve this order?')) {
+              handleStatusUpdate(order, OrderStatuses.APPROVED.value);
+            }
+          }
+        });
+        actions.push({
+          label: 'Cancel',
+          variant: 'destructive',
+          action: () => {
+            if (confirm('Cancel this order?')) {
+              handleStatusUpdate(order, OrderStatuses.CANCELLED.value);
+            }
+          }
+        });
         break;
+        
       case OrderStatuses.APPROVED.value:
-        actions.push({ label: 'Start Production', action: () => handleStartProduction(order), variant: 'default' });
-        actions.push({ label: 'Cancel', action: () => handleCancelOrder(order), variant: 'destructive' });
+        actions.push({
+          label: 'Start Production',
+          variant: 'default',
+          action: async () => {
+            // Check if all materials are available
+            const insufficientMaterials = [];
+            for (const bomItem of (order.bom || [])) {
+              if (bomItem.materialId === 'custom') continue;
+              const material = (rawMaterials || []).find(m => m.id === parseInt(bomItem.materialId));
+              if (material) {
+                const totalNeeded = bomItem.totalNeeded || (parseFloat(bomItem.quantity) * order.quantity);
+                if ((parseFloat(material.quantity) || 0) < totalNeeded) {
+                  insufficientMaterials.push({
+                    name: material.name,
+                    needed: totalNeeded,
+                    available: parseFloat(material.quantity) || 0
+                  });
+                }
+              }
+            }
+            
+            if (insufficientMaterials.length > 0) {
+              const message = insufficientMaterials.map(m => 
+                `${m.name}: Need ${m.needed}, Have ${m.available}`
+              ).join('\n');
+              alert(`Cannot start production. Insufficient materials:\n\n${message}`);
+              return;
+            }
+            
+            if (confirm('Start production? Materials will be deducted from inventory.')) {
+              handleStatusUpdate(order, OrderStatuses.IN_PRODUCTION.value);
+            }
+          }
+        });
+        actions.push({
+          label: 'Cancel',
+          variant: 'destructive',
+          action: () => {
+            if (confirm('Cancel this order?')) {
+              handleStatusUpdate(order, OrderStatuses.CANCELLED.value);
+            }
+          }
+        });
         break;
+        
       case OrderStatuses.IN_PRODUCTION.value:
-        actions.push({ label: 'Complete Production', action: () => handleCompleteProduction(order), variant: 'default' });
-        break;
-      case OrderStatuses.COMPLETED.value:
-        if (order.orderType === 'customer') {
-          actions.push({ label: 'Ready for Delivery', action: () => handleReadyForDelivery(order), variant: 'default' });
+        if (order.orderType === 'stock') {
+          actions.push({
+            label: 'Complete Production',
+            variant: 'default',
+            action: () => {
+              setCompletingOrder(order);
+              setIsCompletionDialogOpen(true);
+            }
+          });
+        } else {
+          actions.push({
+            label: 'Ready for Delivery',
+            variant: 'default',
+            action: () => {
+              if (confirm('Mark as ready for delivery?')) {
+                handleStatusUpdate(order, OrderStatuses.READY_FOR_DELIVERY.value);
+              }
+            }
+          });
         }
         break;
+        
       case OrderStatuses.READY_FOR_DELIVERY.value:
-        actions.push({ label: 'Mark Delivered', action: () => handleReadyForDelivery(order), variant: 'default' });
+        actions.push({
+          label: 'Confirm Delivery',
+          variant: 'default',
+          action: () => {
+            setDeliveringOrder(order);
+            setIsDeliveryDialogOpen(true);
+          }
+        });
         break;
     }
     
@@ -852,7 +878,8 @@ export default function Orders() {
                     </div>
                     <div className="text-xs text-gray-400">
                       Materials: {order.bom?.length || 0} items | 
-                      Labour: {order.labourCosts?.length || 0} entries
+                      Labour: {order.labourCosts?.length || 0} entries |
+                      Other: {order.otherCosts?.length || 0} items
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -900,23 +927,13 @@ export default function Orders() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="stock">
-                    <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Stock Order (Build for Inventory)
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="customer">
-                    <div className="flex items-center gap-2">
-                      <Truck className="w-4 h-4" />
-                      Customer Order (For Delivery)
-                    </div>
-                  </SelectItem>
+                  <SelectItem value="stock">Stock Order (Build for Inventory)</SelectItem>
+                  <SelectItem value="customer">Customer Order (For Delivery)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Customer Selection (only for customer orders) */}
+            {/* Customer Selection (for customer orders) */}
             {formData.orderType === 'customer' && (
               <div className="space-y-2">
                 <Label>Customer *</Label>
@@ -1004,7 +1021,7 @@ export default function Orders() {
               
               {formData.bom.length === 0 ? (
                 <div className="border-2 border-dashed rounded-lg p-4 text-center text-gray-500">
-                  No materials added. Add materials from inventory or custom materials to purchase.
+                  No materials added. Add multiple materials from inventory or custom materials to purchase.
                 </div>
               ) : (
                 <div className="space-y-3 border rounded-lg p-3">
@@ -1195,12 +1212,12 @@ export default function Orders() {
               )}
             </div>
 
-            {/* Labour Costs */}
+            {/* Labour Costs - Per Piece */}
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  Labour Costs
+                  Labour Costs (Per Piece)
                 </Label>
                 <Button type="button" size="sm" variant="outline" onClick={handleAddLabourCost}>
                   <Plus className="w-4 h-4 mr-1" />
@@ -1216,7 +1233,7 @@ export default function Orders() {
                 <div className="space-y-3 border rounded-lg p-3">
                   {formData.labourCosts.map((item, index) => (
                     <div key={index} className="grid grid-cols-12 gap-2 items-end bg-gray-50 p-3 rounded-lg">
-                      <div className="col-span-3">
+                      <div className="col-span-4">
                         <Label className="text-xs">Select Worker</Label>
                         <Select 
                           value={item.labourerId?.toString()} 
@@ -1234,41 +1251,25 @@ export default function Orders() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="col-span-2">
+                      <div className="col-span-3">
                         <Label className="text-xs">Work Type</Label>
                         <Input
                           value={item.workType}
                           onChange={(e) => handleLabourCostChange(index, 'workType', e.target.value)}
-                          placeholder="e.g., Assembly"
+                          placeholder="e.g., Assembly, Upholstery"
                           className="h-9"
                         />
                       </div>
-                      <div className="col-span-2">
-                        <Label className="text-xs">Hours Est.</Label>
+                      <div className="col-span-3">
+                        <Label className="text-xs">Cost Per Piece (NPR)</Label>
                         <Input
                           type="number"
                           min="0"
-                          step="0.5"
-                          value={item.hoursEstimated}
-                          onChange={(e) => handleLabourCostChange(index, 'hoursEstimated', e.target.value)}
+                          value={item.costPerPiece}
+                          onChange={(e) => handleLabourCostChange(index, 'costPerPiece', e.target.value)}
+                          placeholder="Enter cost"
                           className="h-9"
                         />
-                      </div>
-                      <div className="col-span-2">
-                        <Label className="text-xs">Rate/Hour</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={item.ratePerHour}
-                          onChange={(e) => handleLabourCostChange(index, 'ratePerHour', e.target.value)}
-                          className="h-9"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <Label className="text-xs">Total Cost</Label>
-                        <div className="h-9 flex items-center px-2 bg-blue-100 rounded text-sm font-medium">
-                          {formatCurrency(parseFloat(item.cost) || 0)}
-                        </div>
                       </div>
                       <div className="col-span-1">
                         <Button 
@@ -1293,6 +1294,70 @@ export default function Orders() {
               )}
             </div>
 
+            {/* Other/Miscellaneous Costs */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="flex items-center gap-2">
+                  <DollarSign className="w-4 h-4" />
+                  Other Costs (Miscellaneous)
+                </Label>
+                <Button type="button" size="sm" variant="outline" onClick={handleAddOtherCost}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Other Cost
+                </Button>
+              </div>
+              
+              {formData.otherCosts.length === 0 ? (
+                <div className="border-2 border-dashed rounded-lg p-4 text-center text-gray-500">
+                  No other costs added. Click "Add Other Cost" for miscellaneous expenses.
+                </div>
+              ) : (
+                <div className="space-y-3 border rounded-lg p-3">
+                  {formData.otherCosts.map((item, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-2 items-end bg-gray-50 p-3 rounded-lg">
+                      <div className="col-span-7">
+                        <Label className="text-xs">Description</Label>
+                        <Input
+                          value={item.description}
+                          onChange={(e) => handleOtherCostChange(index, 'description', e.target.value)}
+                          placeholder="e.g., Transportation, Packaging, Tools"
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="col-span-3">
+                        <Label className="text-xs">Amount (NPR per unit)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={item.amount}
+                          onChange={(e) => handleOtherCostChange(index, 'amount', e.target.value)}
+                          placeholder="Enter amount"
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Button 
+                          type="button" 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-9 w-9 p-0 text-red-500"
+                          onClick={() => handleRemoveOtherCost(index)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Other Cost Summary */}
+                  <div className="mt-3 pt-3 border-t flex justify-between items-center">
+                    <span className="text-sm text-gray-600">Total Other Costs (per unit):</span>
+                    <span className="font-bold">{formatCurrency(calculateOtherCosts())}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Total Cost Summary */}
             <Card className="bg-blue-50">
               <CardContent className="p-4">
@@ -1304,6 +1369,10 @@ export default function Orders() {
                   <div className="flex justify-between text-sm">
                     <span>Labour Cost (per unit):</span>
                     <span>{formatCurrency(calculateLabourCost())}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Other Costs (per unit):</span>
+                    <span>{formatCurrency(calculateOtherCosts())}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Quantity:</span>
@@ -1388,7 +1457,11 @@ export default function Orders() {
                       <Label className="text-gray-500">Labour Cost</Label>
                       <p className="font-medium">{formatCurrency(viewingOrder.labourCost || 0)}</p>
                     </div>
-                    <div className="col-span-2">
+                    <div>
+                      <Label className="text-gray-500">Other Costs</Label>
+                      <p className="font-medium">{formatCurrency(viewingOrder.otherCost || 0)}</p>
+                    </div>
+                    <div>
                       <Label className="text-gray-500">Total Production Cost</Label>
                       <p className="font-bold text-lg">{formatCurrency(viewingOrder.totalProductionCost)}</p>
                     </div>
@@ -1441,8 +1514,8 @@ export default function Orders() {
                         <tr>
                           <th className="px-3 py-2 text-left">Worker</th>
                           <th className="px-3 py-2 text-left">Work Type</th>
-                          <th className="px-3 py-2 text-right">Hours</th>
-                          <th className="px-3 py-2 text-right">Cost</th>
+                          <th className="px-3 py-2 text-right">Cost/Piece</th>
+                          <th className="px-3 py-2 text-right">Total Cost</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1450,8 +1523,35 @@ export default function Orders() {
                           <tr key={idx} className="border-t">
                             <td className="px-3 py-2">{item.labourerName}</td>
                             <td className="px-3 py-2">{item.workType}</td>
-                            <td className="px-3 py-2 text-right">{item.hoursEstimated}</td>
-                            <td className="px-3 py-2 text-right">{formatCurrency(item.totalCost || item.cost)}</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(item.costPerPiece)}</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(item.totalCost)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Other Costs Details */}
+              {viewingOrder.otherCosts && viewingOrder.otherCosts.length > 0 && (
+                <div>
+                  <Label className="text-gray-500">Other Costs</Label>
+                  <div className="mt-2 border rounded-lg overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Description</th>
+                          <th className="px-3 py-2 text-right">Amount/Unit</th>
+                          <th className="px-3 py-2 text-right">Total Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewingOrder.otherCosts.map((item, idx) => (
+                          <tr key={idx} className="border-t">
+                            <td className="px-3 py-2">{item.description}</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(item.amount)}</td>
+                            <td className="px-3 py-2 text-right">{formatCurrency(item.totalAmount)}</td>
                           </tr>
                         ))}
                       </tbody>

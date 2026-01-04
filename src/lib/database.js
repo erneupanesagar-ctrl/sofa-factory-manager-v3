@@ -4,7 +4,7 @@
 class SofaFactoryDB {
   constructor() {
     this.dbName = 'SofaFactoryManager';
-    this.version = 1;
+    this.version = 2;
     this.db = null;
   }
 
@@ -146,6 +146,25 @@ class SofaFactoryDB {
           syncStore.createIndex('recordId', 'recordId', { unique: false });
           syncStore.createIndex('action', 'action', { unique: false });
           syncStore.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+
+        // Productions
+        if (!db.objectStoreNames.contains('productions')) {
+          const productionStore = db.createObjectStore('productions', { keyPath: 'id', autoIncrement: true });
+          productionStore.createIndex('sofaModelId', 'sofaModelId', { unique: false });
+          productionStore.createIndex('locationId', 'locationId', { unique: false });
+          productionStore.createIndex('status', 'status', { unique: false });
+          productionStore.createIndex('productionType', 'productionType', { unique: false });
+          productionStore.createIndex('startDate', 'startDate', { unique: false });
+        }
+
+        // Labour Payments
+        if (!db.objectStoreNames.contains('labourPayments')) {
+          const labourPaymentStore = db.createObjectStore('labourPayments', { keyPath: 'id', autoIncrement: true });
+          labourPaymentStore.createIndex('labourerId', 'labourerId', { unique: false });
+          labourPaymentStore.createIndex('locationId', 'locationId', { unique: false });
+          labourPaymentStore.createIndex('paymentDate', 'paymentDate', { unique: false });
+          labourPaymentStore.createIndex('status', 'status', { unique: false });
         }
       };
     });

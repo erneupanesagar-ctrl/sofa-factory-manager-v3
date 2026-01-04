@@ -109,7 +109,12 @@ export default function Production() {
 
   const calculateMaterialCostFromBOM = () => {
     if (formData.billOfMaterials && formData.billOfMaterials.length > 0) {
-      return formData.billOfMaterials.reduce((sum, item) => sum + (item.totalCost || 0), 0);
+      return formData.billOfMaterials.reduce((sum, item) => {
+        const rawMaterial = rawMaterials.find(rm => rm.id === parseInt(item.materialId));
+        const unitPrice = rawMaterial?.unitPrice || rawMaterial?.pricePerUnit || 0;
+        const qty = parseFloat(item.quantity) || 0;
+        return sum + (unitPrice * qty);
+      }, 0);
     }
     return 0;
   };

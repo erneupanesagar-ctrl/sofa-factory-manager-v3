@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../contexts/AppContext';
-import { Plus, Search, Factory, CheckCircle, XCircle, Clock, AlertTriangle, Package } from 'lucide-react';
+import { Plus, Search, Factory, CheckCircle, XCircle, Clock, AlertTriangle, Package, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,7 +22,7 @@ export default function Production() {
   const [formData, setFormData] = useState({
     productionType: 'stock', // 'stock' or 'order'
     orderId: null,
-    sofaModelId: null,
+    productName: '',
     quantity: '',
     notes: '',
     billOfMaterials: []
@@ -48,10 +48,9 @@ export default function Production() {
   );
 
   // Validate materials for production
-  const validateMaterials = (sofaModelId, quantity) => {
-    const product = sofaModels.find(p => p.id === parseInt(sofaModelId));
-    if (!product || !product.billOfMaterials || product.billOfMaterials.length === 0) {
-      return { valid: false, message: 'Product has no Bill of Materials defined', materials: [] };
+  const validateMaterials = (bom, quantity) => {
+    if (!bom || bom.length === 0) {
+      return { valid: false, message: 'No Bill of Materials defined', materials: [] };
     }
 
     const validation = {
@@ -60,7 +59,7 @@ export default function Production() {
       materials: []
     };
 
-    product.billOfMaterials.forEach(bomItem => {
+    bom.forEach(bomItem => {
       const rawMaterial = rawMaterials.find(rm => rm.id === parseInt(bomItem.materialId));
       const requiredQty = parseFloat(bomItem.quantity) * parseInt(quantity);
       const availableQty = rawMaterial?.quantity || 0;
@@ -94,15 +93,16 @@ export default function Production() {
   const handleProductChange = (sofaModelId) => {
     const numericId = parseInt(sofaModelId);
     const product = sofaModels.find(p => p.id === numericId);
+    const bom = product?.billOfMaterials || [];
     
     setFormData({ 
       ...formData, 
-      sofaModelId: numericId,
-      billOfMaterials: product?.billOfMaterials || []
+      productName: product?.name || '',
+      billOfMaterials: bom
     });
     
-    if (numericId && formData.quantity) {
-      const validation = validateMaterials(numericId, formData.quantity);
+    if (bom.length > 0 && formData.quantity) {
+      const validation = validateMaterials(bom, formData.quantity);
       setMaterialValidation(validation);
     }
   };
@@ -116,8 +116,8 @@ export default function Production() {
 
   const handleQuantityChange = (quantity) => {
     setFormData({ ...formData, quantity });
-    if (formData.sofaModelId && quantity) {
-      const validation = validateMaterials(formData.sofaModelId, quantity);
+    if (formData.billOfMaterials.length > 0 && quantity) {
+      const validation = validateMaterials(formData.billOfMaterials, quantity);
       setMaterialValidation(validation);
     }
   };
@@ -126,7 +126,7 @@ export default function Production() {
     setFormData({
       productionType: 'stock',
       orderId: null,
-      sofaModelId: null,
+      productName: '',
       quantity: '',
       notes: '',
       billOfMaterials: []
@@ -140,7 +140,7 @@ export default function Production() {
     setFormData({
       productionType: 'stock',
       orderId: null,
-      sofaModelId: null,
+      productName: '',
       quantity: '',
       notes: '',
       billOfMaterials: []
@@ -151,43 +151,59 @@ export default function Production() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.sofaModelId || !formData.quantity) {
-      alert('Please select product and enter quantity');
+    if (!formData.productName || !formData.quantity) {
+      alert('Please enter product name and quantity');
       return;
     }
 
     // Validate materials
-    const validation = validateMaterials(formData.sofaModelId, formData.quantity);
+    const validation = validateMaterials(formData.billOfMaterials, formData.quantity);
     if (!validation.valid) {
       alert('Cannot start production: ' + validation.message + '\n\nPlease purchase more materials first.');
       return;
     }
 
     try {
-      const product = sofaModels.find(p => p.id === parseInt(formData.sofaModelId));
-      const productionNumber = `PROD-${Date.now().toString().slice(-6)}`;
+      // Find existing product or create a new one if it doesn't exist
+      let product = sofaModels.find(p => p.name.toLowerCase() === formData.productName.toLowerCase());
       
-      // AUTOMATION: Update the product's BOM if it was changed in the production dialog
-      if (product && JSON.stringify(product.billOfMaterials) !== JSON.stringify(formData.billOfMaterials)) {
-        await actions.updateItem('sofaModels', {
-          ...product,
+      if (!product) {
+        const newProductId = await actions.addItem('sofaModels', {
+          name: formData.productName,
+          description: 'Auto-created from production',
+          stockQuantity: 0,
           billOfMaterials: formData.billOfMaterials,
-          materialCost: calculateMaterialCostFromBOM()
+          materialCost: calculateMaterialCostFromBOM(),
+          sellingPrice: 0,
+          laborCost: 0,
+          status: 'active',
+          images: []
         });
+        product = { id: newProductId, name: formData.productName };
+      } else {
+        // Update existing product's BOM if changed
+        if (JSON.stringify(product.billOfMaterials) !== JSON.stringify(formData.billOfMaterials)) {
+          await actions.updateItem('sofaModels', {
+            ...product,
+            billOfMaterials: formData.billOfMaterials,
+            materialCost: calculateMaterialCostFromBOM()
+          });
+        }
       }
 
+      const productionNumber = `PROD-${Date.now().toString().slice(-6)}`;
       const productionData = {
         productionNumber,
         productionType: formData.productionType,
         orderId: formData.orderId ? parseInt(formData.orderId) : null,
-        sofaModelId: parseInt(formData.sofaModelId),
+        sofaModelId: product.id,
         productName: product.name,
         quantity: parseInt(formData.quantity),
         billOfMaterials: formData.billOfMaterials,
         materialsNeeded: validation.materials,
         status: 'in_progress',
         startDate: new Date().toISOString(),
-        estimatedCompletionDate: new Date(Date.now() + (product.estimatedDays || 7) * 24 * 60 * 60 * 1000).toISOString(),
+        estimatedCompletionDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         actualCompletionDate: null,
         notes: formData.notes,
         createdAt: new Date().toISOString()
@@ -631,30 +647,44 @@ export default function Production() {
                 </div>
               )}
 
-              {/* Product Selection */}
+              {/* Product Name Input */}
               <div className="space-y-2">
-                <Label>
-                  Select Product <span className="text-red-500">*</span>
+                <Label htmlFor="productName">
+                  Product Name <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={formData.sofaModelId?.toString() || ''}
-                  onValueChange={handleProductChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a product..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {sofaModels && sofaModels.length > 0 ? (
-                      sofaModels.map(product => (
-                        <SelectItem key={product.id} value={product.id.toString()}>
-                          {product.name} (Stock: {product.stockQuantity || 0})
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <div className="p-2 text-sm text-gray-500 text-center">No products found</div>
-                    )}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Input
+                    id="productName"
+                    value={formData.productName}
+                    onChange={(e) => {
+                      const name = e.target.value;
+                      const existingProduct = sofaModels.find(p => p.name.toLowerCase() === name.toLowerCase());
+                      if (existingProduct) {
+                        handleProductChange(existingProduct.id);
+                      } else {
+                        setFormData({ ...formData, productName: name });
+                      }
+                    }}
+                    placeholder="Enter product name (e.g., L-Shape Sofa)"
+                    required
+                  />
+                  {sofaModels.length > 0 && formData.productName && !sofaModels.find(p => p.name.toLowerCase() === formData.productName.toLowerCase()) && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto">
+                      {sofaModels
+                        .filter(p => p.name.toLowerCase().includes(formData.productName.toLowerCase()))
+                        .map(p => (
+                          <div
+                            key={p.id}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                            onClick={() => handleProductChange(p.id)}
+                          >
+                            {p.name} (Existing Product)
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Quantity */}
@@ -796,9 +826,11 @@ export default function Production() {
                                     billOfMaterials: newBOM
                                   });
                                   // Re-validate
-                                  if (formData.sofaModelId) {
-                                    const validation = validateMaterials(formData.sofaModelId, formData.quantity);
+                                  if (newBOM.length > 0 && formData.quantity) {
+                                    const validation = validateMaterials(newBOM, formData.quantity);
                                     setMaterialValidation(validation);
+                                  } else {
+                                    setMaterialValidation(null);
                                   }
                                 }}
                               >

@@ -461,12 +461,22 @@ export default function Orders() {
         await createSaleRecord(order, additionalData);
       }
 
+      // Ensure order has an ID before updating
+      if (!updatedOrder.id) {
+        throw new Error('Order ID is missing');
+      }
+      
+      // Update in database
       await actions.updateItem('orders', updatedOrder);
+      
+      // Update local state
       setOrders(orders.map(o => o.id === order.id ? updatedOrder : o));
       
       return true;
     } catch (error) {
       console.error('Error updating order:', error);
+      console.error('Order:', order);
+      console.error('Updated order:', updatedOrder);
       alert('Failed to update order status. Please try again.');
       return false;
     }

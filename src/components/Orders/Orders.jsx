@@ -866,12 +866,31 @@ export default function Orders() {
                       <p><strong>Product:</strong> {order.productName}</p>
                       <p><strong>Quantity:</strong> {order.quantity}</p>
                       {order.customerName && <p><strong>Customer:</strong> {order.customerName}</p>}
-                      {order.materialsNeedingPurchase?.length > 0 && (
-                        <p className="text-orange-600 flex items-center gap-1">
-                          <AlertTriangle className="w-4 h-4" />
-                          {order.materialsNeedingPurchase.length} material(s) need to be purchased
-                        </p>
-                      )}
+                      {(() => {
+                        // Calculate materials needing purchase based on current inventory
+                        let materialsNeedCount = 0;
+                        (order.bom || []).forEach(item => {
+                          if (item.materialId === 'custom') {
+                            materialsNeedCount++;
+                          } else {
+                            const currentMaterial = (rawMaterials || []).find(m => m.id === parseInt(item.materialId));
+                            const currentStock = currentMaterial ? (parseFloat(currentMaterial.quantity) || 0) : 0;
+                            const totalNeeded = item.totalNeeded || (parseFloat(item.quantity) * (order.quantity || 1));
+                            if (currentStock < totalNeeded) {
+                              materialsNeedCount++;
+                            }
+                          }
+                        });
+                        
+                        if (materialsNeedCount === 0) return null;
+                        
+                        return (
+                          <p className="text-orange-600 flex items-center gap-1">
+                            <AlertTriangle className="w-4 h-4" />
+                            {materialsNeedCount} material(s) need to be purchased
+                          </p>
+                        );
+                      })()}
                       {order.totalProductionCost > 0 && (
                         <p><strong>Production Cost:</strong> {formatCurrency(order.totalProductionCost)}</p>
                       )}
@@ -1469,7 +1488,7 @@ export default function Orders() {
                 )}
               </div>
 
-              {/* BOM Details */}
+              {/* BOM Details - Check current inventory stock */}
               {viewingOrder.bom && viewingOrder.bom.length > 0 && (
                 <div>
                   <Label className="text-gray-500">Bill of Materials</Label>
@@ -1484,20 +1503,37 @@ export default function Orders() {
                         </tr>
                       </thead>
                       <tbody>
-                        {viewingOrder.bom.map((item, idx) => (
-                          <tr key={idx} className="border-t">
-                            <td className="px-3 py-2">{item.materialName}</td>
-                            <td className="px-3 py-2 text-right">{item.quantity} {item.unit}</td>
-                            <td className="px-3 py-2 text-right">{item.totalNeeded} {item.unit}</td>
-                            <td className="px-3 py-2 text-center">
-                              {item.needToPurchase || item.materialId === 'custom' ? (
-                                <Badge variant="outline" className="bg-orange-50 text-orange-700">To Purchase</Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-green-50 text-green-700">In Stock</Badge>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {viewingOrder.bom.map((item, idx) => {
+                          // Check current inventory stock for real-time status
+                          let currentStock = 0;
+                          let isInStock = false;
+                          
+                          if (item.materialId !== 'custom') {
+                            const currentMaterial = (rawMaterials || []).find(m => m.id === parseInt(item.materialId));
+                            if (currentMaterial) {
+                              currentStock = parseFloat(currentMaterial.quantity) || 0;
+                              const totalNeeded = item.totalNeeded || (parseFloat(item.quantity) * (viewingOrder.quantity || 1));
+                              isInStock = currentStock >= totalNeeded;
+                            }
+                          }
+                          
+                          return (
+                            <tr key={idx} className="border-t">
+                              <td className="px-3 py-2">{item.materialName}</td>
+                              <td className="px-3 py-2 text-right">{item.quantity} {item.unit}</td>
+                              <td className="px-3 py-2 text-right">{item.totalNeeded} {item.unit}</td>
+                              <td className="px-3 py-2 text-center">
+                                {item.materialId === 'custom' ? (
+                                  <Badge variant="outline" className="bg-orange-50 text-orange-700">To Purchase</Badge>
+                                ) : isInStock ? (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700">In Stock</Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-orange-50 text-orange-700">To Purchase</Badge>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -1560,23 +1596,55 @@ export default function Orders() {
                 </div>
               )}
 
-              {/* Materials Needing Purchase */}
-              {viewingOrder.materialsNeedingPurchase && viewingOrder.materialsNeedingPurchase.length > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <Label className="text-orange-700 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    Materials Needing Purchase
-                  </Label>
-                  <ul className="mt-2 space-y-1 text-sm">
-                    {viewingOrder.materialsNeedingPurchase.map((item, idx) => (
-                      <li key={idx} className="flex justify-between">
-                        <span>{item.materialName}</span>
-                        <span>{item.shortage} {item.unit}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {/* Materials Needing Purchase - Check current inventory stock */}
+              {(() => {
+                // Calculate materials needing purchase based on current inventory
+                const materialsNeedingPurchase = [];
+                (viewingOrder.bom || []).forEach(item => {
+                  if (item.materialId === 'custom') {
+                    // Custom materials always need to be purchased
+                    materialsNeedingPurchase.push({
+                      materialName: item.materialName,
+                      shortage: item.totalNeeded || item.quantity,
+                      unit: item.unit
+                    });
+                  } else {
+                    const currentMaterial = (rawMaterials || []).find(m => m.id === parseInt(item.materialId));
+                    const currentStock = currentMaterial ? (parseFloat(currentMaterial.quantity) || 0) : 0;
+                    const totalNeeded = item.totalNeeded || (parseFloat(item.quantity) * (viewingOrder.quantity || 1));
+                    if (currentStock < totalNeeded) {
+                      materialsNeedingPurchase.push({
+                        materialName: item.materialName,
+                        shortage: totalNeeded - currentStock,
+                        unit: item.unit,
+                        currentStock: currentStock
+                      });
+                    }
+                  }
+                });
+                
+                if (materialsNeedingPurchase.length === 0) return null;
+                
+                return (
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <Label className="text-orange-700 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4" />
+                      Materials Needing Purchase
+                    </Label>
+                    <ul className="mt-2 space-y-1 text-sm">
+                      {materialsNeedingPurchase.map((item, idx) => (
+                        <li key={idx} className="flex justify-between">
+                          <span>{item.materialName}</span>
+                          <span className="text-orange-700">
+                            {item.shortage} {item.unit}
+                            {item.currentStock !== undefined && ` (Have: ${item.currentStock})`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
 
               {/* Status History */}
               {viewingOrder.statusHistory && viewingOrder.statusHistory.length > 0 && (

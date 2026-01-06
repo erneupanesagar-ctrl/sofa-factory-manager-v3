@@ -476,7 +476,6 @@ export default function Orders() {
     } catch (error) {
       console.error('Error updating order:', error);
       console.error('Order:', order);
-      console.error('Updated order:', updatedOrder);
       alert('Failed to update order status. Please try again.');
       return false;
     }
@@ -502,8 +501,7 @@ export default function Orders() {
       }
     }
     
-    // Refresh raw materials
-    await actions.loadRawMaterials();
+    // Raw materials are already updated in the state via updateItem
   };
 
   const addToFinishedProducts = async (order, completionData) => {

@@ -207,6 +207,14 @@ class SofaFactoryDB {
             productionStore.createIndex('startDate', 'startDate', { unique: false });
           }
 
+          // Finished Products
+          if (!db.objectStoreNames.contains('finishedProducts')) {
+            const finishedProductStore = db.createObjectStore('finishedProducts', { keyPath: 'id', autoIncrement: true });
+            finishedProductStore.createIndex('orderId', 'orderId', { unique: false });
+            finishedProductStore.createIndex('locationId', 'locationId', { unique: false });
+            finishedProductStore.createIndex('createdAt', 'createdAt', { unique: false });
+          }
+
           // Labour Payments
           if (!db.objectStoreNames.contains('labourPayments')) {
             const labourPaymentStore = db.createObjectStore('labourPayments', { keyPath: 'id', autoIncrement: true });

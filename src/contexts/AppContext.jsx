@@ -27,6 +27,7 @@ const initialState = {
   notifications: [],
   productions: [],
   orders: [],
+  finishedProducts: [],
   
   // UI State
   sidebarOpen: false,
@@ -61,6 +62,7 @@ const ActionTypes = {
   SET_NOTIFICATIONS: 'SET_NOTIFICATIONS',
   SET_PRODUCTIONS: 'SET_PRODUCTIONS',
   SET_ORDERS: 'SET_ORDERS',
+  SET_FINISHED_PRODUCTS: 'SET_FINISHED_PRODUCTS',
   
   // CRUD actions
   ADD_ITEM: 'ADD_ITEM',
@@ -177,6 +179,12 @@ function appReducer(state, action) {
       return {
         ...state,
         productions: action.payload
+      };
+      
+    case ActionTypes.SET_FINISHED_PRODUCTS:
+      return {
+        ...state,
+        finishedProducts: action.payload
       };
       
     case ActionTypes.SET_ORDERS:
@@ -328,7 +336,8 @@ export function AppProvider({ children }) {
         cleaningServices,
         notifications,
         productions,
-        orders
+        orders,
+        finishedProducts
       ] = await Promise.all([
         db.getAll('suppliers'),
         db.getAll('customers'),
@@ -340,7 +349,8 @@ export function AppProvider({ children }) {
         db.getAll('cleaningServices'),
         db.getAll('notifications'),
         db.getAll('productions'),
-        db.getAll('orders')
+        db.getAll('orders'),
+        db.getAll('finishedProducts')
       ]);
 
       dispatch({ type: ActionTypes.SET_SUPPLIERS, payload: suppliers || [] });
@@ -354,6 +364,7 @@ export function AppProvider({ children }) {
       dispatch({ type: ActionTypes.SET_NOTIFICATIONS, payload: notifications || [] });
       dispatch({ type: ActionTypes.SET_PRODUCTIONS, payload: productions || [] });
       dispatch({ type: ActionTypes.SET_ORDERS, payload: orders || [] });
+      dispatch({ type: ActionTypes.SET_FINISHED_PRODUCTS, payload: finishedProducts || [] });
     } catch (error) {
       console.error('Failed to load all data:', error);
     }
@@ -372,7 +383,8 @@ export function AppProvider({ children }) {
         cleaningServices,
         notifications,
         productions,
-        orders
+        orders,
+        finishedProducts
       ] = await Promise.all([
         db.getAll('suppliers', 'locationId', locationId),
         db.getAll('customers', 'locationId', locationId),
@@ -384,7 +396,8 @@ export function AppProvider({ children }) {
         db.getAll('cleaningServices', 'locationId', locationId),
         db.getAll('notifications', 'userId', auth.getCurrentUser()?.id),
         db.getAll('productions', 'locationId', locationId),
-        db.getAll('orders', 'locationId', locationId)
+        db.getAll('orders', 'locationId', locationId),
+        db.getAll('finishedProducts', 'locationId', locationId)
       ]);
 
       dispatch({ type: ActionTypes.SET_SUPPLIERS, payload: suppliers || [] });
@@ -398,6 +411,7 @@ export function AppProvider({ children }) {
       dispatch({ type: ActionTypes.SET_NOTIFICATIONS, payload: notifications || [] });
       dispatch({ type: ActionTypes.SET_PRODUCTIONS, payload: productions || [] });
       dispatch({ type: ActionTypes.SET_ORDERS, payload: orders || [] });
+      dispatch({ type: ActionTypes.SET_FINISHED_PRODUCTS, payload: finishedProducts || [] });
     } catch (error) {
       console.error('Failed to load location data:', error);
     }

@@ -4,7 +4,7 @@
 class SofaFactoryDB {
   constructor() {
     this.dbName = 'SofaFactoryManager';
-    this.version = 3; // Incremented to force schema update
+    this.version = 4; // Incremented to force schema update and add finishedProducts
     this.db = null;
     this.initPromise = null;
   }

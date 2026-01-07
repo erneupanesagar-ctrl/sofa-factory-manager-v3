@@ -516,11 +516,33 @@ export default function Orders() {
         photo: completionData.productPhotoPreview || null,
         orderId: order.id,
         orderNumber: order.orderNumber,
+        locationId: order.locationId || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
       await actions.addItem('finishedProducts', finishedProduct);
+      
+      // Auto-update stock in sofaModels
+      const existingSofaModel = (state.sofaModels || []).find(m => m.name === order.productName);
+      if (existingSofaModel) {
+        await actions.updateItem('sofaModels', {
+          ...existingSofaModel,
+          quantity: (existingSofaModel.quantity || 0) + order.quantity,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        await actions.addItem('sofaModels', {
+          name: order.productName,
+          quantity: order.quantity,
+          sellingPrice: parseFloat(completionData.sellingPrice) || 0,
+          productionCost: order.totalProductionCost / order.quantity,
+          locationId: order.locationId || null,
+          status: 'available',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
     } catch (error) {
       console.error('Error adding to finished products:', error);
     }

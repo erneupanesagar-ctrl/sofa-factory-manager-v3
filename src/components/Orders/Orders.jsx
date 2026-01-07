@@ -506,13 +506,22 @@ export default function Orders() {
 
   const addToFinishedProducts = async (order, completionData) => {
     try {
+      const materialCostPerUnit = order.materialCost || 0;
+      const labourCostPerUnit = order.labourCost || 0;
+      const otherCostPerUnit = order.otherCost || 0;
+      const totalProductionCostPerUnit = materialCostPerUnit + labourCostPerUnit + otherCostPerUnit;
+      
       const finishedProduct = {
         name: order.productName,
         description: `Produced from order ${order.orderNumber}`,
         quantity: order.quantity,
         sellingPrice: parseFloat(completionData.sellingPrice) || 0,
-        productionCost: order.totalProductionCost / order.quantity,
+        materialCost: materialCostPerUnit,
+        labourCost: labourCostPerUnit,
+        otherCost: otherCostPerUnit,
+        productionCost: totalProductionCostPerUnit,
         totalValue: (parseFloat(completionData.sellingPrice) || 0) * order.quantity,
+        totalProductionValue: totalProductionCostPerUnit * order.quantity,
         photo: completionData.productPhotoPreview || null,
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -529,6 +538,11 @@ export default function Orders() {
         await actions.updateItem('sofaModels', {
           ...existingSofaModel,
           quantity: (existingSofaModel.quantity || 0) + order.quantity,
+          materialCost: materialCostPerUnit,
+          labourCost: labourCostPerUnit,
+          otherCost: otherCostPerUnit,
+          productionCost: totalProductionCostPerUnit,
+          sellingPrice: parseFloat(completionData.sellingPrice) || existingSofaModel.sellingPrice,
           updatedAt: new Date().toISOString()
         });
       } else {
@@ -536,7 +550,10 @@ export default function Orders() {
           name: order.productName,
           quantity: order.quantity,
           sellingPrice: parseFloat(completionData.sellingPrice) || 0,
-          productionCost: order.totalProductionCost / order.quantity,
+          materialCost: materialCostPerUnit,
+          labourCost: labourCostPerUnit,
+          otherCost: otherCostPerUnit,
+          productionCost: totalProductionCostPerUnit,
           locationId: order.locationId || null,
           status: 'available',
           createdAt: new Date().toISOString(),

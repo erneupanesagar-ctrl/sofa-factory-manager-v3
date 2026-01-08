@@ -4,7 +4,7 @@
 class SofaFactoryDB {
   constructor() {
     this.dbName = 'SofaFactoryManager';
-    this.version = 4; // Incremented to force schema update and add finishedProducts
+    this.version = 5; // Incremented to add attendance store
     this.db = null;
     this.initPromise = null;
   }
@@ -222,6 +222,14 @@ class SofaFactoryDB {
             labourPaymentStore.createIndex('locationId', 'locationId', { unique: false });
             labourPaymentStore.createIndex('paymentDate', 'paymentDate', { unique: false });
             labourPaymentStore.createIndex('status', 'status', { unique: false });
+          }
+          
+          if (!db.objectStoreNames.contains('attendance')) {
+            const attendanceStore = db.createObjectStore('attendance', { keyPath: 'id', autoIncrement: true });
+            attendanceStore.createIndex('labourerId', 'labourerId', { unique: false });
+            attendanceStore.createIndex('locationId', 'locationId', { unique: false });
+            attendanceStore.createIndex('date', 'date', { unique: false });
+            attendanceStore.createIndex('status', 'status', { unique: false });
           }
         };
       } catch (error) {

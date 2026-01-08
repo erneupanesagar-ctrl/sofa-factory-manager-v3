@@ -700,7 +700,7 @@ export default function Sales() {
 
               <div>
                 <Label>Payment Method</Label>
-                <p className="font-medium capitalize">{viewingSale.paymentMethod.replace('_', ' ')}</p>
+                <p className="font-medium capitalize">{viewingSale.paymentMethod ? viewingSale.paymentMethod.replace('_', ' ') : 'N/A'}</p>
               </div>
 
               {viewingSale.paymentHistory && viewingSale.paymentHistory.length > 0 && (
@@ -712,7 +712,7 @@ export default function Sales() {
                         <div>
                           <p className="font-medium">{formatCurrency(payment.amount)}</p>
                           <p className="text-xs text-gray-500">
-                            {payment.method.replace('_', ' ')} • {formatDate(payment.date)}
+                            {payment.method ? payment.method.replace('_', ' ') : 'N/A'} • {formatDate(payment.date)}
                           </p>
                           {payment.note && (
                             <p className="text-xs text-gray-600 mt-1">{payment.note}</p>

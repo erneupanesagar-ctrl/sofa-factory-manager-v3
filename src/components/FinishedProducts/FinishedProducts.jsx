@@ -22,6 +22,7 @@ export default function FinishedProducts() {
     description: '',
     materialCost: '',
     laborCost: '',
+    otherCost: '',
     sellingPrice: '',
     estimatedDays: '',
     stockQuantity: '',
@@ -43,9 +44,10 @@ export default function FinishedProducts() {
         description: product.description || '',
         materialCost: product.materialCost || '',
         laborCost: product.laborCost || '',
+        otherCost: product.otherCost || '',
         sellingPrice: product.sellingPrice || '',
         estimatedDays: product.estimatedDays || '',
-        stockQuantity: product.stockQuantity || '0',
+        stockQuantity: product.quantity || product.stockQuantity || '0',
         billOfMaterials: product.billOfMaterials || [],
         images: product.images || [],
         primaryImageId: product.primaryImageId || null
@@ -57,6 +59,7 @@ export default function FinishedProducts() {
         description: '',
         materialCost: '',
         laborCost: '',
+        otherCost: '',
         sellingPrice: '',
         estimatedDays: '',
         stockQuantity: '',
@@ -74,6 +77,7 @@ export default function FinishedProducts() {
       description: '',
       materialCost: '',
       laborCost: '',
+      otherCost: '',
       sellingPrice: '',
       estimatedDays: '',
       stockQuantity: '',
@@ -84,15 +88,10 @@ export default function FinishedProducts() {
   };
 
   const calculateTotalCost = () => {
-    // Calculate material cost from BOM if available, otherwise use manual input
-    let materialCost = 0;
-    if (formData.billOfMaterials && formData.billOfMaterials.length > 0) {
-      materialCost = formData.billOfMaterials.reduce((sum, item) => sum + (item.totalCost || 0), 0);
-    } else {
-      materialCost = parseFloat(formData.materialCost) || 0;
-    }
+    const material = parseFloat(formData.materialCost) || 0;
     const labor = parseFloat(formData.laborCost) || 0;
-    return materialCost + labor;
+    const other = parseFloat(formData.otherCost) || 0;
+    return material + labor + other;
   };
 
   const calculateMaterialCostFromBOM = () => {
@@ -194,8 +193,10 @@ export default function FinishedProducts() {
         primaryImageId: formData.primaryImageId || null,
         materialCost: finalMaterialCost,
         laborCost: parseFloat(formData.laborCost) || 0,
+        otherCost: parseFloat(formData.otherCost) || 0,
         sellingPrice: parseFloat(formData.sellingPrice) || 0,
         estimatedDays: parseInt(formData.estimatedDays) || 0,
+        quantity: parseInt(formData.stockQuantity) || 0,
         stockQuantity: parseInt(formData.stockQuantity) || 0,
         totalCost: calculateTotalCost(),
         profit: calculateProfit(),
@@ -306,7 +307,7 @@ export default function FinishedProducts() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-3 gap-2 text-sm">
                     <div>
                       <p className="text-gray-500">Material Cost</p>
                       <p className="font-semibold">{formatCurrency(product.materialCost)}</p>
@@ -314,6 +315,10 @@ export default function FinishedProducts() {
                     <div>
                       <p className="text-gray-500">Labor Cost</p>
                       <p className="font-semibold text-blue-600">{formatCurrency(product.laborCost)}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Other Cost</p>
+                      <p className="font-semibold text-orange-600">{formatCurrency(product.otherCost || 0)}</p>
                     </div>
                   </div>
 
@@ -350,8 +355,8 @@ export default function FinishedProducts() {
                   <div className="pt-2 border-t">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-500">Stock Quantity</span>
-                      <Badge variant={(product.stockQuantity || 0) > 0 ? 'default' : 'destructive'}>
-                        {product.stockQuantity || 0} units
+                      <Badge variant={(product.quantity || product.stockQuantity || 0) > 0 ? 'default' : 'destructive'}>
+                        {product.quantity || product.stockQuantity || 0} units
                       </Badge>
                     </div>
                   </div>
@@ -567,6 +572,24 @@ export default function FinishedProducts() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="otherCost" className="flex items-center">
+                    <DollarSign className="w-4 h-4 mr-1 text-orange-600" />
+                    Other Costs (NPR) - Miscellaneous
+                  </Label>
+                  <Input
+                    id="otherCost"
+                    type="number"
+                    step="0.01"
+                    value={formData.otherCost}
+                    onChange={(e) => setFormData({ ...formData, otherCost: e.target.value })}
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-gray-500">e.g., Transportation, Packaging, Tools, etc.</p>
+                </div>
+              </div>
+
               <div className="p-4 bg-gray-50 rounded-lg">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm font-medium text-gray-700">Total Cost</span>
@@ -574,7 +597,7 @@ export default function FinishedProducts() {
                     {formatCurrency(calculateTotalCost())}
                   </span>
                 </div>
-                <p className="text-xs text-gray-500">Material Cost + Labor Cost</p>
+                <p className="text-xs text-gray-500">Material Cost + Labor Cost + Other Costs</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

@@ -456,8 +456,8 @@ export default function Orders() {
         await addToFinishedProducts(order, additionalData);
       }
 
-      // Handle customer order delivery - create sale record
-      if (order.orderType === 'customer' && newStatus === OrderStatuses.DELIVERED.value) {
+      // Handle customer order completion - create pending sale record
+      if (order.orderType === 'customer' && newStatus === OrderStatuses.COMPLETED.value) {
         await createSaleRecord(order, additionalData);
       }
 
@@ -565,24 +565,44 @@ export default function Orders() {
     }
   };
 
-  const createSaleRecord = async (order, deliveryData) => {
+  const createSaleRecord = async (order, completionData) => {
     try {
+      // Generate sales number
+      const salesNumber = `SAL-${Date.now().toString().slice(-6)}`;
+      
       const saleRecord = {
+        salesNumber: salesNumber,
         orderId: order.id,
         orderNumber: order.orderNumber,
+        orderType: order.orderType,
         customerId: order.customerId,
         customerName: order.customerName,
         customerPhone: order.customerPhone,
+        customerEmail: order.customerEmail || '',
         productName: order.productName,
+        productImage: completionData?.productPhoto || null,
         quantity: order.quantity,
-        unitPrice: order.unitPrice,
-        totalAmount: order.totalAmount,
-        productionCost: order.totalProductionCost,
-        profit: order.totalAmount - order.totalProductionCost,
-        deliveryDate: deliveryData.deliveryDate,
-        deliveryNotes: deliveryData.deliveryNotes,
-        deliveryPhoto: deliveryData.deliveryPhotoPreview || null,
-        status: 'completed',
+        unitPrice: completionData?.sellingPrice || order.unitPrice || 0,
+        totalAmount: (completionData?.sellingPrice || order.unitPrice || 0) * order.quantity,
+        materialCost: order.totalMaterialCost || 0,
+        labourCost: order.totalLabourCost || 0,
+        otherCost: order.totalOtherCost || 0,
+        productionCost: order.totalProductionCost || 0,
+        profit: ((completionData?.sellingPrice || order.unitPrice || 0) * order.quantity) - (order.totalProductionCost || 0),
+        bom: order.bom || [],
+        labourDetails: order.labourDetails || [],
+        otherCosts: order.otherCosts || [],
+        paymentMethod: 'cash',
+        paymentStatus: 'unpaid',
+        dueAmount: (completionData?.sellingPrice || order.unitPrice || 0) * order.quantity,
+        paidAmount: 0,
+        paymentHistory: [],
+        deliveryDate: completionData?.deliveryDate || '',
+        deliveryNotes: completionData?.deliveryNotes || '',
+        deliveryPhoto: completionData?.deliveryPhoto || null,
+        status: 'pending_approval',
+        approvedBy: null,
+        approvedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

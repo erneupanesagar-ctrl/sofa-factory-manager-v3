@@ -119,8 +119,8 @@ export default function Sales() {
       // Update sale status
       const updatedSale = {
         ...sale,
+        status: 'approved',
         approvalStatus: 'approved',
-        status: 'completed',
         approvedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -151,8 +151,8 @@ export default function Sales() {
     try {
       const updatedSale = {
         ...sale,
-        approvalStatus: 'rejected',
         status: 'rejected',
+        approvalStatus: 'rejected',
         rejectionReason: reason,
         rejectedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -363,16 +363,16 @@ export default function Sales() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold">{sale.saleNumber}</h3>
-                      {sale.approvalStatus === 'pending' && (
+                      <h3 className="text-lg font-semibold">{sale.salesNumber || sale.saleNumber}</h3>
+                      {(sale.status === 'pending_approval' || sale.approvalStatus === 'pending') && (
                         <Badge className="bg-orange-500 text-white">Pending Approval</Badge>
                       )}
-                      {sale.approvalStatus === 'approved' && (
+                      {(sale.status === 'approved' || sale.approvalStatus === 'approved') && (
                         <Badge variant="default" className="bg-green-100 text-green-800">
                           Approved
                         </Badge>
                       )}
-                      {sale.approvalStatus === 'rejected' && (
+                      {(sale.status === 'rejected' || sale.approvalStatus === 'rejected') && (
                         <Badge className="bg-red-100 text-red-800">Rejected</Badge>
                       )}
                       {sale.paymentStatus === 'paid' && (
@@ -419,7 +419,7 @@ export default function Sales() {
                   </div>
 
                   <div className="flex gap-2">
-                    {sale.approvalStatus === 'pending' && (
+                    {(sale.status === 'pending_approval' || sale.approvalStatus === 'pending') && (
                       <>
                         <Button
                           variant="default"

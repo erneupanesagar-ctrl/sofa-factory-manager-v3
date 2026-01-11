@@ -571,6 +571,10 @@ export default function Orders() {
       const salesNumber = `SAL-${Date.now().toString().slice(-6)}`;
       const totalAmount = (completionData?.sellingPrice || order.unitPrice || 0) * order.quantity;
       
+      console.log('Creating sale record for order:', order.orderNumber);
+      console.log('Completion data:', completionData);
+      console.log('Total amount:', totalAmount);
+      
       const saleRecord = {
         saleNumber: salesNumber,
         salesNumber: salesNumber,
@@ -610,7 +614,9 @@ export default function Orders() {
         updatedAt: new Date().toISOString()
       };
 
-      await actions.addItem('sales', saleRecord);
+      console.log('Sale record to be saved:', saleRecord);
+      const result = await actions.addItem('sales', saleRecord);
+      console.log('Sale record saved successfully:', result);
     } catch (error) {
       console.error('Error creating sale record:', error);
     }

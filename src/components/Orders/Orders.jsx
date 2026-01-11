@@ -569,8 +569,10 @@ export default function Orders() {
     try {
       // Generate sales number
       const salesNumber = `SAL-${Date.now().toString().slice(-6)}`;
+      const totalAmount = (completionData?.sellingPrice || order.unitPrice || 0) * order.quantity;
       
       const saleRecord = {
+        saleNumber: salesNumber,
         salesNumber: salesNumber,
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -583,24 +585,25 @@ export default function Orders() {
         productImage: completionData?.productPhoto || null,
         quantity: order.quantity,
         unitPrice: completionData?.sellingPrice || order.unitPrice || 0,
-        totalAmount: (completionData?.sellingPrice || order.unitPrice || 0) * order.quantity,
-        materialCost: order.totalMaterialCost || 0,
-        labourCost: order.totalLabourCost || 0,
-        otherCost: order.totalOtherCost || 0,
+        totalAmount: totalAmount,
+        materialCost: order.materialCost || 0,
+        labourCost: order.labourCost || 0,
+        otherCost: order.otherCost || 0,
         productionCost: order.totalProductionCost || 0,
-        profit: ((completionData?.sellingPrice || order.unitPrice || 0) * order.quantity) - (order.totalProductionCost || 0),
+        profit: totalAmount - (order.totalProductionCost || 0),
         bom: order.bom || [],
         labourDetails: order.labourDetails || [],
         otherCosts: order.otherCosts || [],
         paymentMethod: 'cash',
         paymentStatus: 'unpaid',
-        dueAmount: (completionData?.sellingPrice || order.unitPrice || 0) * order.quantity,
+        dueAmount: totalAmount,
         paidAmount: 0,
         paymentHistory: [],
         deliveryDate: completionData?.deliveryDate || '',
         deliveryNotes: completionData?.deliveryNotes || '',
         deliveryPhoto: completionData?.deliveryPhoto || null,
         status: 'pending_approval',
+        approvalStatus: 'pending',
         approvedBy: null,
         approvedAt: null,
         createdAt: new Date().toISOString(),

@@ -111,7 +111,16 @@ export default function Sales() {
   };
 
   const handleApproveSale = async (sale) => {
-    if (!window.confirm(`Approve sale ${sale.saleNumber}? This will deduct ${sale.quantity} units from inventory.`)) {
+    // For order-based sales (from customer orders), no stock deduction is needed
+    // as materials were already deducted when production started
+    const isOrderBasedSale = sale.orderId && sale.orderType === 'customer';
+    
+    const saleNumber = sale.saleNumber || sale.salesNumber;
+    const confirmMessage = isOrderBasedSale 
+      ? `Approve sale ${saleNumber}? This will finalize the customer order.`
+      : `Approve sale ${saleNumber}? This will deduct ${sale.quantity} units from inventory.`;
+    
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
@@ -119,25 +128,30 @@ export default function Sales() {
       // Update sale status
       const updatedSale = {
         ...sale,
-        status: 'approved',
+        status: 'completed',
         approvalStatus: 'approved',
         approvedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
       await actions.updateItem('sales', updatedSale);
 
-      // Deduct stock from product
-      const product = sofaModels.find(p => p.id === sale.productId);
-      if (product) {
-        const updatedProduct = {
-          ...product,
-          stockQuantity: (product.stockQuantity || 0) - sale.quantity,
-          updatedAt: new Date().toISOString()
-        };
-        await actions.updateItem('sofaModels', updatedProduct);
+      // Only deduct stock for regular sales (not from customer orders)
+      if (!isOrderBasedSale && sale.productId) {
+        const product = sofaModels.find(p => p.id === sale.productId);
+        if (product) {
+          const updatedProduct = {
+            ...product,
+            stockQuantity: (product.stockQuantity || 0) - sale.quantity,
+            updatedAt: new Date().toISOString()
+          };
+          await actions.updateItem('sofaModels', updatedProduct);
+        }
       }
 
-      alert('Sale approved successfully! Stock has been updated.');
+      const message = isOrderBasedSale 
+        ? 'Sale approved successfully! Customer order has been finalized.'
+        : 'Sale approved successfully! Stock has been updated.';
+      alert(message);
     } catch (error) {
       console.error('Error approving sale:', error);
       alert('Failed to approve sale. Please try again.');
@@ -145,7 +159,8 @@ export default function Sales() {
   };
 
   const handleRejectSale = async (sale) => {
-    const reason = window.prompt(`Reject sale ${sale.saleNumber}? Please enter reason:`);
+    const saleNumber = sale.saleNumber || sale.salesNumber;
+    const reason = window.prompt(`Reject sale ${saleNumber}? Please enter reason:`);
     if (!reason) return;
 
     try {
@@ -364,10 +379,10 @@ export default function Sales() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold">{sale.salesNumber || sale.saleNumber}</h3>
-                      {(sale.status === 'pending_approval' || sale.approvalStatus === 'pending') && (
+                      {(sale.status === 'pending_approval' || sale.status === 'pending' || sale.approvalStatus === 'pending') && (
                         <Badge className="bg-orange-500 text-white">Pending Approval</Badge>
                       )}
-                      {(sale.status === 'approved' || sale.approvalStatus === 'approved') && (
+                      {(sale.status === 'approved' || sale.status === 'completed' || sale.approvalStatus === 'approved') && (
                         <Badge variant="default" className="bg-green-100 text-green-800">
                           Approved
                         </Badge>
@@ -419,7 +434,7 @@ export default function Sales() {
                   </div>
 
                   <div className="flex gap-2">
-                    {(sale.status === 'pending_approval' || sale.approvalStatus === 'pending') && (
+                    {(sale.status === 'pending_approval' || sale.status === 'pending' || sale.approvalStatus === 'pending') && (
                       <>
                         <Button
                           variant="default"

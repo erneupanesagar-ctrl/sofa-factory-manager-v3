@@ -532,6 +532,44 @@ export default function Orders() {
 
       await actions.addItem('finishedProducts', finishedProduct);
       
+      // Create a sales record for stock order
+      const sellingPrice = parseFloat(completionData.sellingPrice) || 0;
+      const totalAmount = sellingPrice * order.quantity;
+      const salesNumber = `SAL-${Date.now().toString().slice(-6)}`;
+      const saleRecord = {
+        saleNumber: salesNumber,
+        salesNumber: salesNumber,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        orderType: order.orderType,
+        productName: order.productName,
+        productImage: completionData.productPhotoPreview || null,
+        quantity: order.quantity,
+        unitPrice: sellingPrice,
+        totalAmount: totalAmount,
+        materialCost: order.materialCost || 0,
+        labourCost: order.labourCost || 0,
+        otherCost: order.otherCost || 0,
+        productionCost: order.totalProductionCost || 0,
+        profit: totalAmount - (order.totalProductionCost || 0),
+        bom: order.bom || [],
+        labourDetails: order.labourDetails || [],
+        otherCosts: order.otherCosts || [],
+        paymentMethod: 'cash',
+        paymentStatus: 'unpaid',
+        dueAmount: totalAmount,
+        paidAmount: 0,
+        paymentHistory: [],
+        status: 'pending',
+        approvalStatus: 'pending',
+        approvedBy: null,
+        approvedAt: null,
+        locationId: order.locationId || null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await actions.addItem('sales', saleRecord);
+      
       // Auto-update stock in sofaModels
       const existingSofaModel = (state.sofaModels || []).find(m => m.name === order.productName);
       if (existingSofaModel) {

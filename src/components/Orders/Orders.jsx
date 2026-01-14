@@ -606,10 +606,11 @@ export default function Orders() {
         deliveryDate: completionData?.deliveryDate || '',
         deliveryNotes: completionData?.deliveryNotes || '',
         deliveryPhoto: completionData?.deliveryPhoto || null,
-        status: 'pending_approval',
+        status: 'pending',
         approvalStatus: 'pending',
         approvedBy: null,
         approvedAt: null,
+        locationId: order.locationId || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };

@@ -8,8 +8,7 @@ import { formatCurrency } from './utils';
  */
 async function getNotificationSettings(actions) {
   try {
-  const settings = await actions.getAll(\'notificationSettings\');
-    return settings && settings.length > 0 ? settings[0] : null;
+  const settings = await actions.getAll(\'notificationSettings\');   return settings && settings.length > 0 ? settings[0] : null;
   } catch (error) {
     console.error('Error getting notification settings:', error);
     return null;

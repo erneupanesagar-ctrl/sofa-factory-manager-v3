@@ -1045,7 +1045,7 @@ export default function Orders() {
           <DialogHeader>
             <DialogTitle>Create New Order</DialogTitle>
             <DialogDescription>
-              Create a stock order (for inventory) or customer order (for delivery)
+              Create a stock order (for inventory) or customer order (for delivery).
             </DialogDescription>
           </DialogHeader>
           
@@ -1546,6 +1546,9 @@ export default function Orders() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Order Details - {viewingOrder?.orderNumber}</DialogTitle>
+            <DialogDescription>
+              View the complete details of this order, including materials, labor, and costs.
+            </DialogDescription>
           </DialogHeader>
           
           {viewingOrder && (
@@ -1866,7 +1869,7 @@ export default function Orders() {
           <DialogHeader>
             <DialogTitle>Confirm Delivery</DialogTitle>
             <DialogDescription>
-              Record delivery details for this order
+              Record delivery details for this order.
             </DialogDescription>
           </DialogHeader>
           

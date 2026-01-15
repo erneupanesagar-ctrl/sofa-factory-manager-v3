@@ -607,7 +607,7 @@ export default function Production() {
           <DialogHeader>
             <DialogTitle>New Production</DialogTitle>
             <DialogDescription>
-              Start a new production job. Materials will be validated before starting.
+              Start a new production run for a sofa model.
             </DialogDescription>
           </DialogHeader>
 
@@ -920,6 +920,9 @@ export default function Production() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Production Details - {viewingProduction.productionNumber}</DialogTitle>
+            <DialogDescription>
+              View the details and progress of this production order.
+            </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-4">

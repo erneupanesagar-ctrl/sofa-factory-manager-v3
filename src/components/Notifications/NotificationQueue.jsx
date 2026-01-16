@@ -19,7 +19,7 @@ export default function NotificationQueue() {
 
   const loadNotifications = async () => {
     try {
-      const allNotifications = await actions.getItems('notificationQueue');
+      const allNotifications = await actions.getAll("notificationQueue");
       // Sort by created date, newest first
       const sorted = (allNotifications || []).sort((a, b) => 
         new Date(b.createdAt) - new Date(a.createdAt)

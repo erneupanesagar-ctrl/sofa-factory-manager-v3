@@ -21,7 +21,7 @@ export default function NotificationSettings() {
 
   const loadSettings = async () => {
     try {
-      const allSettings = await actions.getItems('notificationSettings');
+      const allSettings = await actions.getAll("notificationSettings");
       if (allSettings && allSettings.length > 0) {
         setSettings(allSettings[0]);
       } else {

@@ -299,7 +299,7 @@ export default function Production() {
           // AUTO-GENERATE SALE RECORD
           const customer = state.customers?.find(c => c.id === order.customerId);
           if (customer && product) {
-            console.log('Attempting to create sale record for order:', order.orderNumber);
+
             const saleData = {
               saleNumber: `SALE-${Date.now().toString().slice(-6)}`,
               customerId: customer.id,
@@ -320,8 +320,7 @@ export default function Production() {
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             };
-            const saleId = await actions.addItem('sales', saleData);
-            console.log('Sale record created with ID:', saleId);
+            await actions.addItem('sales', saleData);
           }
         }
       }

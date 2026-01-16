@@ -520,6 +520,16 @@ export function AppProvider({ children }) {
       }
     },
 
+    getAll: async (collection) => {
+      try {
+        const items = await db.getAll(collection);
+        return items || [];
+      } catch (error) {
+        console.error(`Failed to get all ${collection}:`, error);
+        return [];
+      }
+    },
+
     getAllOrders: async () => {
       try {
         const orders = await db.getAll('orders');

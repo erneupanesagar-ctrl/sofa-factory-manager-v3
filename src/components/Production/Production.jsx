@@ -299,6 +299,7 @@ export default function Production() {
           // AUTO-GENERATE SALE RECORD
           const customer = state.customers?.find(c => c.id === order.customerId);
           if (customer && product) {
+            console.log('Attempting to create sale record for order:', order.orderNumber);
             const saleData = {
               saleNumber: `SALE-${Date.now().toString().slice(-6)}`,
               customerId: customer.id,
@@ -310,14 +311,17 @@ export default function Production() {
               totalAmount: (product.sellingPrice || 0) * production.quantity,
               paidAmount: 0, // Initial paid amount for auto-generated sale
               paymentStatus: 'pending',
-              status: 'approved', // Auto-approved since production is complete
-              approvalStatus: 'approved',
+              status: 'pending', // Needs admin approval
+
+              approvalStatus: 'pending',
+
               orderId: order.id,
               notes: `Auto-generated from Production #${production.productionNumber}`,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString()
             };
-            await actions.addItem('sales', saleData);
+            const saleId = await actions.addItem('sales', saleData);
+            console.log('Sale record created with ID:', saleId);
           }
         }
       }

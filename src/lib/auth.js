@@ -38,8 +38,28 @@ class AuthManager {
     return users.length === 0;
   }
 
+  // Reset database (for troubleshooting)
+  async resetDatabase() {
+    try {
+      await db.resetDatabase();
+      this.currentUser = null;
+      return true;
+    } catch (error) {
+      console.error('Failed to reset database:', error);
+      throw error;
+    }
+  }
+
   // Create admin account (first time setup)
   async createAdminAccount(userData) {
+    // Check if email already exists
+    if (userData.email) {
+      const existingUsers = await db.getAll('users', 'email', userData.email);
+      if (existingUsers && existingUsers.length > 0) {
+        throw new Error('An admin account with this email already exists. Please use a different email or reset the database.');
+      }
+    }
+
     const adminData = {
       ...userData,
       role: USER_ROLES.ADMIN,

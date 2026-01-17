@@ -18,8 +18,8 @@ import Purchases from './Purchases/Purchases';
 import Financials from './Financials/Financials';
 import Reports from './Reports/Reports';
 // Production section merged into Orders
-import NotificationSettings from './Notifications/NotificationSettings';
-import NotificationQueue from './Notifications/NotificationQueue';
+import NotificationSettings from './Notifications/NotificationSettings_v2';
+import NotificationQueue from './Notifications/NotificationQueue_v2';
 
 // Placeholder component for features under development
 function PlaceholderView({ title, description }) {

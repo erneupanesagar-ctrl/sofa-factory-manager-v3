@@ -530,6 +530,12 @@ export function AppProvider({ children }) {
       }
     },
 
+    // Safety net for old cached code
+    getItems: async (collection) => {
+      console.warn(`DEPRECATED: Calling getItems. Redirecting to getAll for collection: ${collection}`);
+      return actions.getAll(collection);
+    },
+
     getAllOrders: async () => {
       try {
         const orders = await db.getAll('orders');
@@ -539,6 +545,8 @@ export function AppProvider({ children }) {
         return [];
       }
     },
+
+
 
     // UI actions
     setSidebarOpen: (open) => {

@@ -133,8 +133,23 @@ export default function SetupWizard() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => {
-    if (validateStep(currentStep)) {
+  const handleResetDatabase = async () => {
+    if (!window.confirm('WARNING: This will permanently delete ALL data and restart the setup process. Are you sure you want to continue?')) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await actions.resetDatabase();
+      window.location.reload();
+    } catch (error) {
+      alert('Failed to reset database. Check console for details.');
+      console.error('Database reset failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNext = async () => {f (validateStep(currentStep)) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -519,12 +534,17 @@ export default function SetupWizard() {
 
               {currentStep < steps.length - 1 ? (
                 <Button onClick={handleNext}>
-                  Next
+                  {loading ? 'Processing...' : 'Next'}
                 </Button>
               ) : (
-                <Button onClick={handleComplete} disabled={loading}>
-                  {loading ? 'Setting up...' : 'Complete Setup'}
-                </Button>
+                <div className="flex gap-4">
+                  <Button onClick={() => handleNext()} disabled={loading}>
+                    {loading ? 'Setting up...' : 'Complete Setup'}
+                  </Button>
+                  <Button variant="destructive" onClick={handleResetDatabase} disabled={loading}>
+                    Reset Database
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>

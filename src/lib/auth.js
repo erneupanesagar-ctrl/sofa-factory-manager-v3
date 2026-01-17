@@ -69,9 +69,18 @@ class AuthManager {
       locationId: null // Admin can access all locations
     };
 
-    const adminId = await db.add('users', adminData);
-    this.currentUser = await db.get('users', adminId);
-    return this.currentUser;
+    try {
+      const adminId = await db.add('users', adminData);
+      this.currentUser = await db.get('users', adminId);
+      return this.currentUser;
+    } catch (error) {
+      // Check for constraint violation (DOMException)
+      if (error.name === 'ConstraintError' || (error.message && error.message.includes('constraint'))) {
+        console.warn('Constraint violation detected during admin creation. Suggesting database reset.');
+        throw new Error('Database constraint violation detected. This usually means an account already exists. Please try resetting the database.');
+      }
+      throw error;
+    }
   }
 
   // Generate setup code for new users
